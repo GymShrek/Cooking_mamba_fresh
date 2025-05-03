@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1japa5yphhsm"]
+
+[ext_resource type="Script" uid="uid://rotgqvtx2653" path="res://scripts/snake_head.gd" id="1_3tjdq"]
+
+[node name="SnakeHead" type="Node2D"]
+script = ExtResource("1_3tjdq")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]

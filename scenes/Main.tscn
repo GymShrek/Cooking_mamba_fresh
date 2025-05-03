@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://qvybiyai4wut"]
+
+[ext_resource type="Script" uid="uid://dw60r7g0rwb1a" path="res://main.gd" id="1_rarhs"]
+[ext_resource type="Script" uid="uid://deicdmxbe0gug" path="res://grid.gd" id="2_vcsgt"]
+[ext_resource type="Script" uid="uid://b5dpfn03i6qoy" path="res://snake.gd" id="3_c01mt"]
+[ext_resource type="Script" uid="uid://xikg6ogy8adi" path="res://resource_counter.gd" id="4_nxtc6"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_rarhs")
+
+[node name="Grid" type="TileMap" parent="."]
+format = 2
+script = ExtResource("2_vcsgt")
+
+[node name="Snake" type="Node2D" parent="."]
+script = ExtResource("3_c01mt")
+
+[node name="Collectibles" type="Node2D" parent="."]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="ResourceCounter" type="Label" parent="UI"]
+offset_right = 40.0
+offset_bottom = 23.0
+script = ExtResource("4_nxtc6")
