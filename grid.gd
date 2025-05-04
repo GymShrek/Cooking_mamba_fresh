@@ -25,6 +25,9 @@ func create_tileset():
 	# Load rock texture for boundaries
 	var rock_texture = preload("res://assets/rock.png")
 	atlas_source.texture = rock_texture
+	
+	# Create a tile with the full texture
+	atlas_source.texture_region_size = Vector2i(CELL_SIZE, CELL_SIZE)
 	atlas_source.create_tile(Vector2i(0, 0))
 	
 	return new_tileset

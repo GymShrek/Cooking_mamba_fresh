@@ -6,11 +6,11 @@ extends Node2D
 @onready var snake = $Snake
 
 var collectible_scene = preload("res://scenes/Collectible.tscn")
-var resource_types = ["wheat"]  # For now, just wheat
+var resource_types = ["wheat", "tomato", "lettuce"]  # Updated resource types
 
 func _ready():
 	# Initialize the game
-	spawn_collectibles(5)  # Spawn 5 collectibles to start
+	spawn_collectibles(6)  # Spawn 6 collectibles (2 of each type)
 
 func spawn_collectibles(count):
 	for i in range(count):
@@ -54,8 +54,9 @@ func spawn_single_collectible():
 	# Set the position
 	collectible.position = grid.grid_to_world(grid_pos)
 	
-	# Set the resource type (for now just wheat)
-	collectible.set_resource_type(resource_types[0])
+	# Choose a random resource type from our list
+	var resource_type = resource_types[randi() % resource_types.size()]
+	collectible.set_resource_type(resource_type)
 	
 	# Add the collectible to the scene
 	collectibles.add_child(collectible)

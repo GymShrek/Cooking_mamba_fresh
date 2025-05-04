@@ -14,3 +14,9 @@ config/name="Cooking Mamba"
 run/main_scene="uid://qvybiyai4wut"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+
+[display]
+
+window/size/mode=2
+window/stretch/scale=3.0
+window/stretch/scale_mode="integer"
