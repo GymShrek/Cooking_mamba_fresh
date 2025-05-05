@@ -8,18 +8,18 @@ enum Direction { UP, RIGHT, DOWN, LEFT }
 @onready var grid: TileMap = get_parent().get_node("Grid")
 
 # Snake properties
+var game_speed = 0.2
 var current_direction = Direction.RIGHT
 var next_direction = Direction.RIGHT
 var segments = []
 var turn_timer = 0
-var turn_delay = 0.2  # 0.2 seconds per turn
+var turn_delay = game_speed  # 0.2 seconds per turn (your new speed)
 var can_move = true
-var pending_resource = null
 
 # Input buffer system
 var input_buffer = []
 var input_buffer_size = 3  # Store up to 3 inputs
-var buffer_processing_time = 0.1  # Process buffer every 0.1 seconds
+var buffer_processing_time = game_speed/5  # Process buffer every 0.1 seconds
 var buffer_timer = 0
 
 # Snake body parts scenes
@@ -148,11 +148,6 @@ func move_snake():
 	if collectible:
 		collect_resource(collectible)
 	
-	# Process pending resource from previous turn
-	if pending_resource != null:
-		grow_snake_with_food(pending_resource)
-		pending_resource = null
-	
 	# Move snake body
 	move_body()
 	
@@ -189,14 +184,17 @@ func collect_resource(collectible):
 	# Get the resource type from the collectible
 	var resource_type = collectible.resource_type
 	
-	# Store the pending resource for next turn
-	pending_resource = resource_type
-	
 	# Add resource to collected list
 	resources_collected.append(resource_type)
 	
 	# Signal that a resource was collected
 	emit_signal("resource_collected", resource_type)
+	
+	# Create sparkle effect at the collectible's position
+	create_sparkle_effect(collectible.position)
+	
+	# Grow the snake by adding a full mid-section
+	grow_snake_with_food(resource_type)
 	
 	# Remove the collectible
 	collectible.queue_free()
@@ -204,17 +202,50 @@ func collect_resource(collectible):
 	# Spawn a new collectible
 	get_parent().spawn_single_collectible()
 
+func create_sparkle_effect(position):
+	# Create a CPUParticles2D node for the sparkle effect
+	var particles = CPUParticles2D.new()
+	particles.position = position
+	particles.emitting = true
+	particles.one_shot = true
+	particles.explosiveness = 0.8
+	particles.lifetime = game_speed*2
+	particles.amount = 15
+	particles.direction = Vector2(0, -1)
+	particles.spread = 180
+	particles.gravity = Vector2(0, 98)
+	particles.initial_velocity_min = 50
+	particles.initial_velocity_max = 100
+	particles.scale_amount_min = 1
+	particles.scale_amount_max = 2
+	
+	# Set colors for sparkles
+	var color_ramp = Gradient.new()
+	color_ramp.colors = [Color(1, 1, 0.5, 1), Color(1, 1, 1, 0)]  # Yellow to transparent white
+	particles.color_ramp = color_ramp
+	
+	# Add to the scene and set to auto-free when finished
+	get_parent().add_child(particles)
+	
+	# Set up a timer to remove the particles after they finish
+	var timer = Timer.new()
+	timer.wait_time = 1.0  # Slightly longer than particle lifetime
+	timer.one_shot = true
+	timer.autostart = true
+	get_parent().add_child(timer)
+	
+	# Connect the timer to a function that removes the particles
+	timer.timeout.connect(func(): particles.queue_free(); timer.queue_free())
 
 func grow_snake_with_food(resource_type):
 	# Create a new body segment carrying food
 	var body = body_scene.instantiate()
 	
-	# Add the new segment right behind the head
+	# Position for the new segment (right behind the head)
 	var head_pos = segments[0].grid_pos
-	var second_segment_pos = segments[1].grid_pos
 	
-	# Position the new body segment at the same position as the second segment
-	body.position = grid.grid_to_world(second_segment_pos)
+	# Insert the new segment right behind the head (at position 1)
+	body.position = grid.grid_to_world(segments[1].grid_pos)
 	
 	# Set it as carrying food with the specific resource type
 	body.set_carrying_food(true, resource_type)
@@ -223,7 +254,7 @@ func grow_snake_with_food(resource_type):
 	add_child(body)
 	segments.insert(1, {
 		"node": body,
-		"grid_pos": second_segment_pos,
+		"grid_pos": segments[1].grid_pos,
 		"carrying_food": true,
 		"resource_type": resource_type
 	})
