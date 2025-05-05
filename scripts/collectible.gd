@@ -10,6 +10,7 @@ var movement_pattern = []  # For predetermined movement patterns
 var target_position = Vector2i()
 var is_flying = false  # For chicken animation states
 var flying_cooldown = 0
+var facing_direction = Vector2i(1, 0)  # Default facing right
 
 # Resource textures dictionary
 var resource_textures = {
@@ -38,6 +39,7 @@ var resource_preferences = {
 # Reference to grid and main nodes
 var grid
 var main
+var egg_spawn_chance = 0.05  # 5% chance to spawn an egg per chicken movement
 
 func _ready():
 	# Set up the collectible appearance based on resource type
@@ -52,9 +54,9 @@ func _ready():
 		is_moving = true
 		
 		# Set size multiplier for cow
-		#if resource_type == "cow":
-			#size_multiplier = 2
-			#scale = Vector2(2, 1)  # Double the length, same width
+		if resource_type == "cow":
+			size_multiplier = 2
+			scale = Vector2(2, 2)  # Double the length and width
 
 func set_resource_type(type):
 	resource_type = type
@@ -67,7 +69,7 @@ func set_resource_type(type):
 		# Set size multiplier for cow
 		if resource_type == "cow":
 			size_multiplier = 2
-			scale = Vector2(2, 1)  # Double the length, same width
+			scale = Vector2(2, 2)  # Make it 2x2 in size
 	else:
 		is_animal = false
 		is_moving = false
@@ -87,9 +89,49 @@ func update_appearance():
 				$Sprite2D.texture = resource_textures["chicken"]
 		else:
 			$Sprite2D.texture = resource_textures[resource_type]
+		
+		# Handle sprite rotation based on facing direction
+		if is_animal:
+			update_sprite_direction()
+
+func update_sprite_direction():
+	# Reset rotation and flip
+	$Sprite2D.rotation = 0
+	$Sprite2D.flip_h = false
+	$Sprite2D.flip_v = false
+	
+	# Apply appropriate transform based on facing direction
+	if facing_direction.x > 0:  # Right
+		# Default sprite orientation is typically facing left, so flip it
+		$Sprite2D.flip_h = true
+	elif facing_direction.x < 0:  # Left
+		# No change if sprite already faces left
+		pass
+	elif facing_direction.y > 0:  # Down
+		$Sprite2D.rotation = deg_to_rad(90)
+		# Depending on your sprites, you may need to flip as well
+		$Sprite2D.flip_h = true  # This might need adjustment based on your sprites
+	elif facing_direction.y < 0:  # Up
+		$Sprite2D.rotation = deg_to_rad(-90)
+		# Depending on your sprites, you may need to flip as well
+		$Sprite2D.flip_h = true  # This might need adjustment based on your sprites
 
 func move(snake_segments):
 	if not is_moving or not is_animal:
+		return
+		
+	# If chicken is flying, it's uncollectible
+	if resource_type == "chicken" and is_flying:
+		flying_cooldown -= 1
+		if flying_cooldown <= 0:
+			is_flying = false
+			# Check if we landed on the snake, if so, move to the nearest available position
+			var grid_pos = grid.world_to_grid(position)
+			for segment in snake_segments:
+				if segment.grid_pos == grid_pos:
+					slide_to_nearest_valid_position(grid_pos, segment.grid_pos)
+					break
+		update_appearance()
 		return
 		
 	var grid_pos = grid.world_to_grid(position)
@@ -101,10 +143,18 @@ func move(snake_segments):
 			new_pos = move_mouse(grid_pos, snake_head_pos, snake_segments)
 		"chicken":
 			new_pos = move_chicken(grid_pos, snake_head_pos, snake_segments)
+			# Check for egg spawning chance
+			if randf() <= egg_spawn_chance:
+				spawn_egg_behind(grid_pos)
 		"pig":
 			new_pos = move_pig(grid_pos, snake_head_pos, snake_segments)
 		"cow":
 			new_pos = move_cow(grid_pos, snake_head_pos, snake_segments)
+	
+	# Update facing direction based on movement
+	if new_pos != grid_pos:
+		facing_direction = new_pos - grid_pos
+		update_sprite_direction()
 	
 	# Update position if it changed and the new position is valid
 	if new_pos != grid_pos and is_position_valid(new_pos, resource_type):
@@ -114,6 +164,46 @@ func move(snake_segments):
 			destroy_resource(collectible)
 		
 		position = grid.grid_to_world(new_pos)
+
+# Slide to nearest valid position when chicken lands on the snake
+func slide_to_nearest_valid_position(current_pos, snake_pos):
+	var directions = [
+		Vector2i(1, 0),   # Right
+		Vector2i(-1, 0),  # Left
+		Vector2i(0, 1),   # Down
+		Vector2i(0, -1)   # Up
+	]
+	
+	# Try each direction until we find a valid position
+	for dir in directions:
+		var test_pos = current_pos + dir
+		if is_position_valid(test_pos) and test_pos != snake_pos:
+			position = grid.grid_to_world(test_pos)
+			facing_direction = dir
+			update_sprite_direction()
+			return
+
+# Spawn an egg behind the chicken
+func spawn_egg_behind(chicken_pos):
+	# Calculate position behind the chicken (opposite of facing direction)
+	var behind_pos = chicken_pos - facing_direction
+	
+	# Check if position is valid
+	if not is_position_valid(behind_pos):
+		return
+	
+	# Check if there's already a collectible there
+	for collectible in main.get_node("Collectibles").get_children():
+		if grid.world_to_grid(collectible.position) == behind_pos:
+			return
+	
+	# Create the egg
+	var egg = load("res://scenes/Collectible.tscn").instantiate()
+	egg.position = grid.grid_to_world(behind_pos)
+	egg.set_resource_type("egg")
+	
+	# Add to the scene
+	main.get_node("Collectibles").add_child(egg)
 
 # Check if a position is valid (not occupied by animals or snake and within grid)
 func is_position_valid(pos, ignore_resource_type = ""):
@@ -134,10 +224,12 @@ func is_position_valid(pos, ignore_resource_type = ""):
 			if collectible.resource_type != "cow" and collectible_pos == pos:
 				return false
 			
-			# For cow (2x1 size)
+			# For cow (2x2 size)
 			if collectible.resource_type == "cow":
-				if collectible_pos == pos or collectible_pos + Vector2i(1, 0) == pos:
-					return false
+				for x in range(2):
+					for y in range(2):
+						if collectible_pos + Vector2i(x, y) == pos:
+							return false
 	
 	return true
 
@@ -228,20 +320,12 @@ func move_mouse(curr_pos, snake_head_pos, snake_segments):
 
 # Chicken movement: back and forth with jumping when snake approaches
 func move_chicken(curr_pos, snake_head_pos, snake_segments):
-	# Handle flying animation state
-	if is_flying:
-		flying_cooldown -= 1
-		if flying_cooldown <= 0:
-			is_flying = false
-		update_appearance()
-		return curr_pos  # Don't move while flying
-	
 	# Check if snake is within 1 square - activate flying
-	if snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - curr_pos).length() <= 1.5:
+	if not is_flying and snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - curr_pos).length() <= 1.5:
 		is_flying = true
 		flying_cooldown = 2  # Will take 2 turns to land
 		update_appearance()
-		return curr_pos
+		return curr_pos  # Don't move while flying starts
 	
 	# 50% chance to move randomly, 50% chance to return to starting position
 	if movement_pattern.size() == 0:
@@ -357,7 +441,7 @@ func move_cow(curr_pos, snake_head_pos, snake_segments):
 		var milk_pos = grid.world_to_grid(nearest_milk.position)
 		
 		# If too far from milk, move toward it
-		if min_distance > 4:
+		if min_distance > 8:  # Increased from 4 to 8 as requested
 			# Calculate the direction vector (avoid using normalized)
 			var diff = milk_pos - curr_pos
 			if abs(diff.x) > abs(diff.y):
@@ -383,7 +467,7 @@ func move_cow(curr_pos, snake_head_pos, snake_segments):
 			# Choose first direction that keeps cow within range of milk
 			for dir in directions:
 				var new_pos = Vector2i(curr_pos.x + dir.x * 2, curr_pos.y + dir.y * 2)
-				if (new_pos - milk_pos).length() <= 4 and is_position_valid(new_pos):
+				if (new_pos - milk_pos).length() <= 8 and is_position_valid(new_pos):
 					move_dir = dir
 					break
 	else:
@@ -408,7 +492,6 @@ func move_cow(curr_pos, snake_head_pos, snake_segments):
 	return curr_pos  # Stay in place if no valid moves
 
 # Helper function to move toward a target position
-# Renamed to avoid confusion with any built-in move_toward function
 func move_toward_pos(curr_pos, target_pos, snake_segments):
 	var diff = target_pos - curr_pos
 	var move_dir = Vector2i()
