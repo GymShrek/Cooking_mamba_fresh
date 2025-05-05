@@ -7,6 +7,9 @@ enum Direction { UP, RIGHT, DOWN, LEFT }
 # References to scene nodes
 @onready var grid: TileMap = get_parent().get_node("Grid")
 
+# Dictionary of resources that should be treated as double-width
+var double_width_resources = ["cow"]  # Add any future double-width resources here
+
 # Snake properties
 var game_speed = 0.2
 var current_direction = Direction.RIGHT
@@ -159,8 +162,39 @@ func move_snake():
 	update_segments_appearance()
 
 func move_body():
-	# Move each segment to the position of the segment in front of it
+	# Special handling for double-width segments (front and back)
 	for i in range(segments.size() - 1, 0, -1):
+		# Handle double-width back segment specially - it follows the front segment in a consistent way
+		if i > 0 and "is_double_back" in segments[i] and segments[i].is_double_back:
+			var front_index = i - 1
+			# Make sure the previous segment is the double-width front segment
+			if front_index >= 0 and "is_double_front" in segments[front_index] and segments[front_index].is_double_front:
+				# Get the front segment's position and direction
+				var front_pos = segments[front_index].grid_pos
+				
+				# Get the direction of the front segment based on its rotation
+				var front_dir = Vector2i()
+				var rotation_deg = rad_to_deg(segments[front_index].node.rotation)
+				
+				match int(rotation_deg) % 360:
+					0:   # Right
+						front_dir = Vector2i(1, 0)
+					90:  # Down
+						front_dir = Vector2i(0, 1)
+					180: # Left
+						front_dir = Vector2i(-1, 0)
+					270: # Up
+						front_dir = Vector2i(0, -1)
+				
+				# Position the back segment directly behind the front segment
+				segments[i].grid_pos = Vector2i(
+					front_pos.x - front_dir.x,
+					front_pos.y - front_dir.y
+				)
+				segments[i].node.position = grid.grid_to_world(segments[i].grid_pos)
+				continue
+		
+		# Normal segment movement
 		segments[i].grid_pos = segments[i-1].grid_pos
 		segments[i].node.position = grid.grid_to_world(segments[i].grid_pos)
 
@@ -176,8 +210,19 @@ func check_collectible_collision(pos: Vector2i):
 	var collectibles_node = get_parent().get_node("Collectibles")
 	for collectible in collectibles_node.get_children():
 		var collectible_grid_pos = grid.world_to_grid(collectible.position)
+		
+		# For regular collectibles
 		if collectible_grid_pos == pos:
 			return collectible
+		
+		# Special case for cow (2x1 size)
+		if collectible.resource_type == "cow":
+			# Check if snake head collides with any part of the cow
+			for x in range(2):
+				for y in range(collectible.size_multiplier == 2):
+					if collectible_grid_pos + Vector2i(x, y) == pos:
+						return collectible
+	
 	return null
 
 func collect_resource(collectible):
@@ -191,16 +236,22 @@ func collect_resource(collectible):
 	emit_signal("resource_collected", resource_type)
 	
 	# Create sparkle effect at the collectible's position
-	create_sparkle_effect(collectible.position)
+	get_parent().create_sparkle_effect(collectible.position)
 	
-	# Grow the snake by adding a full mid-section
-	grow_snake_with_food(resource_type)
+	# Handle different resource types
+	if resource_type in double_width_resources:
+		# Special case for double-width resources
+		grow_snake_with_double_segment(resource_type)
+	else:
+		# Regular resources add a regular body segment
+		grow_snake_with_food(resource_type)
 	
 	# Remove the collectible
 	collectible.queue_free()
 	
-	# Spawn a new collectible
-	get_parent().spawn_single_collectible()
+	# Spawn a new collectible - but only for static resources
+	if not collectible.is_animal:
+		get_parent().spawn_single_collectible()
 
 func create_sparkle_effect(position):
 	# Create a CPUParticles2D node for the sparkle effect
@@ -262,10 +313,63 @@ func grow_snake_with_food(resource_type):
 	# Update the segment appearances
 	update_segments_appearance()
 
+# Special function to add a double-width segment (which is actually two segments visually connected)
+func grow_snake_with_double_segment(resource_type):
+	# Create the first body segment (front part)
+	var front_segment = body_scene.instantiate()
+	front_segment.position = grid.grid_to_world(segments[1].grid_pos)
+	
+	# Set it as first half of the double segment
+	front_segment.set_carrying_food(true, resource_type)
+	front_segment.set_is_double_front(true)
+	
+	# Create the second body segment (back part)
+	var back_segment = body_scene.instantiate()
+	
+	# Position the back segment in the same place initially (will be moved in update_segments_appearance)
+	back_segment.position = grid.grid_to_world(segments[1].grid_pos)
+	
+	# Set it as second half of the double segment, with a modified resource type to identify it
+	back_segment.set_carrying_food(true, resource_type + "_back")
+	back_segment.set_is_double_back(true)
+	
+	# Add both segments to the scene
+	add_child(front_segment)
+	add_child(back_segment)
+	
+	# Insert both segments after the head
+	segments.insert(1, {
+		"node": front_segment,
+		"grid_pos": segments[1].grid_pos,
+		"carrying_food": true,
+		"resource_type": resource_type,
+		"is_double_front": true
+	})
+	
+	segments.insert(2, {
+		"node": back_segment,
+		"grid_pos": segments[1].grid_pos,  # Same as front initially, will be updated
+		"carrying_food": true,
+		"resource_type": resource_type + "_back",
+		"is_double_back": true
+	})
+	
+	# Update the segment appearances and positions
+	update_segments_appearance()
+
 func update_segments_appearance():
 	# Update the rotation and appearance of each segment
 	for i in range(segments.size()):
 		update_segment_rotation(i)
+		
+		# Special handling for double-width segments to ensure they appear connected
+		if i > 0 and i < segments.size() - 1:
+			# If this is a double-width front segment, ensure back segment is aligned
+			if "is_double_front" in segments[i] and segments[i].is_double_front:
+				var back_index = i + 1
+				if back_index < segments.size() and "is_double_back" in segments[back_index] and segments[back_index].is_double_back:
+					# Copy the rotation from front to back segment for visual consistency
+					segments[back_index].node.rotation = segments[i].node.rotation
 
 func update_segment_rotation(index):
 	var segment = segments[index]
