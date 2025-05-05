@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://qvybiyai4wut"]
+[gd_scene load_steps=6 format=3 uid="uid://qvybiyai4wut"]
 
-[ext_resource type="Script" uid="uid://dw60r7g0rwb1a" path="res://main.gd" id="1_rarhs"]
-[ext_resource type="Script" uid="uid://deicdmxbe0gug" path="res://grid.gd" id="2_vcsgt"]
-[ext_resource type="Script" uid="uid://b5dpfn03i6qoy" path="res://snake.gd" id="3_c01mt"]
-[ext_resource type="Script" uid="uid://xikg6ogy8adi" path="res://resource_counter.gd" id="4_nxtc6"]
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_rarhs"]
+[ext_resource type="Script" path="res://scripts/grid.gd" id="2_vcsgt"]
+[ext_resource type="Script" path="res://scripts/snake/snake.gd" id="3_c01mt"]
+[ext_resource type="Script" path="res://scripts/resource_counter.gd" id="4_nxtc6"]
+[ext_resource type="Script" path="res://scripts/animal_controller.gd" id="5_y5grh"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_rarhs")
@@ -16,6 +17,9 @@ script = ExtResource("2_vcsgt")
 script = ExtResource("3_c01mt")
 
 [node name="Collectibles" type="Node2D" parent="."]
+
+[node name="AnimalController" type="Node2D" parent="."]
+script = ExtResource("5_y5grh")
 
 [node name="UI" type="CanvasLayer" parent="."]
 
