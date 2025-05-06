@@ -394,11 +394,44 @@ func check_collectible_collision(pos: Vector2i):
 					if collectible_grid_pos + Vector2i(x, y) == pos:
 						return collectible
 	
+	# Also check the AnimalController's animals list
+	var animal_controller = get_parent().get_node("AnimalController")
+	if animal_controller:
+		for animal in animal_controller.animals:
+			# Skip chickens that are flying
+			if animal.type == "chicken" and animal.is_flying:
+				continue
+				
+			# For regular animals
+			if animal.grid_pos == pos:
+				return animal
+			
+			# Special case for cow (2x2 size)
+			if animal.type == "cow":
+				for x in range(2):
+					for y in range(2):
+						if animal.grid_pos + Vector2i(x, y) == pos:
+							return animal
+	
 	return null
 
 func collect_resource(collectible):
-	# Get the resource type from the collectible
-	var resource_type = collectible.resource_type
+	var resource_type = ""
+	var is_animal = false
+	
+	# Check if this is an animal from the AnimalController
+	if collectible is Animal:
+		resource_type = collectible.type
+		is_animal = true
+		
+		# Remove the animal from the controller's list
+		var animal_controller = get_parent().get_node("AnimalController")
+		if animal_controller:
+			animal_controller.remove_animal(collectible)
+	else:
+		# This is a regular collectible
+		resource_type = collectible.resource_type
+		is_animal = collectible.is_animal
 	
 	# Add resource to collected list
 	resources_collected.append(resource_type)
@@ -407,7 +440,7 @@ func collect_resource(collectible):
 	emit_signal("resource_collected", resource_type)
 	
 	# Create sparkle effect at the collectible's position
-	get_parent().create_sparkle_effect(collectible.position)
+	get_parent().create_sparkle_effect(collectible.position if collectible is Animal else collectible.position)
 	
 	# Handle different resource types
 	if resource_type in double_width_resources:
@@ -417,11 +450,12 @@ func collect_resource(collectible):
 		# Regular resources add a regular body segment
 		grow_snake_with_food(resource_type)
 	
-	# Remove the collectible
-	collectible.queue_free()
+	# Remove the collectible - Animals are removed by AnimalController.remove_animal
+	if not (collectible is Animal):
+		collectible.queue_free()
 	
-	# Spawn a new collectible - but only for static resources
-	if not collectible.is_animal:
+	# Spawn a new collectible - but only for static resources, not animals
+	if not is_animal:
 		get_parent().spawn_single_collectible()
 
 func create_sparkle_effect(position):

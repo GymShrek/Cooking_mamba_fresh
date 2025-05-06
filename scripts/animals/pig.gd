@@ -3,7 +3,7 @@ extends Animal
 class_name PigAnimal
 
 var current_dir = Vector2i()
-var detection_range = 8 # Increased from 5 to 8
+@export var detection_range: int = 5  # Changed from 8 to 5 as requested
 var destroyable_resources = ["milk", "tomato", "lettuce", "wheat", "egg"] # Priority order
 
 func _ready():
@@ -92,46 +92,3 @@ func choose_new_direction():
 	
 	# If no valid direction, set to zero
 	current_dir = Vector2i()
-
-# Find the nearest resource that this animal can destroy
-func find_nearest_destroyable_resource(curr_pos, max_distance):
-	var collectibles_node = main.get_node("Collectibles")
-	var nearest_resource = null
-	var min_distance = max_distance + 1  # Beyond our search range
-	
-	# First pass: check for any destroyable resources in range
-	for collectible in collectibles_node.get_children():
-		# Skip if not a destroyable resource
-		if collectible.is_animal or not (collectible.resource_type in destroyable_resources):
-			continue
-		
-		var resource_pos = grid.world_to_grid(collectible.position)
-		var distance = (resource_pos - curr_pos).length()
-		
-		if distance < min_distance:
-			min_distance = distance
-			nearest_resource = collectible
-	
-	# If we found a resource in range, check if there's a higher priority one
-	if nearest_resource:
-		var priority_index = destroyable_resources.find(nearest_resource.resource_type)
-		
-		# Second pass: look for higher priority resources
-		for collectible in collectibles_node.get_children():
-			if collectible.is_animal:
-				continue
-				
-			var this_priority = destroyable_resources.find(collectible.resource_type)
-			
-			# If this resource is higher priority
-			if this_priority != -1 and this_priority < priority_index:
-				var resource_pos = grid.world_to_grid(collectible.position)
-				var distance = (resource_pos - curr_pos).length()
-				
-				# Accept if it's within 1.5x the distance of our current nearest
-				if distance <= min_distance * 1.5 and distance <= max_distance:
-					min_distance = distance
-					nearest_resource = collectible
-					priority_index = this_priority
-	
-	return nearest_resource

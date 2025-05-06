@@ -2,10 +2,13 @@
 extends Animal
 class_name ChickenAnimal
 
-var movement_pattern = []
-var target_position = Vector2i()
-var jump_pos = Vector2i() # Store position from which the chicken jumped
+var previous_pos = Vector2i()
+var is_returning = false
 var egg_spawn_chance = 0.05 # 5% chance to spawn an egg per movement
+
+# Add a grounded timer to prevent continuous flying
+@export var grounded_cooldown_time: int = 3  # Turns before it can fly again
+var grounded_cooldown = 0  # Current cooldown counter
 
 # Textures for different flight states
 var normal_texture
@@ -15,7 +18,8 @@ var flying_texture
 func _ready():
 	super()
 	type = "chicken"
-	movement_behavior = "flee"
+	movement_behavior = "random"
+	previous_pos = grid_pos # Store initial position
 	
 func setup_sprite():
 	normal_texture = load("res://assets/chicken.png")
@@ -27,8 +31,12 @@ func move():
 	var snake_head_pos = snake.segments[0].grid_pos
 	var new_pos = grid_pos
 	
-	# Check if snake is within 1 square - activate flying
-	if not is_flying and snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - grid_pos).length() <= 1.5:
+	# Decrease grounded cooldown if active
+	if grounded_cooldown > 0:
+		grounded_cooldown -= 1
+	
+	# Check if snake is within 1 square and can fly (cooldown expired)
+	if not is_flying and grounded_cooldown <= 0 and snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - grid_pos).length() <= 1.5:
 		start_flying()
 		return # Don't move while flying starts
 	
@@ -40,13 +48,17 @@ func move():
 	# Possibly spawn an egg
 	try_spawn_egg()
 	
-	# Normal movement pattern
-	new_pos = get_movement_position(snake_head_pos)
+	# New movement pattern: random movement with 50% chance to return to previous position
+	new_pos = get_random_movement_with_return(snake_head_pos)
 	
 	# Update facing direction and position
 	update_facing_direction(new_pos)
 	
 	if new_pos != grid_pos:
+		# Remember previous position before moving
+		previous_pos = grid_pos
+		
+		# Update to new position
 		grid_pos = new_pos
 		position = grid.grid_to_world(new_pos)
 
@@ -67,6 +79,9 @@ func process_flying():
 func land_after_flight():
 	is_flying = false
 	$Sprite2D.texture = normal_texture
+	
+	# Set the grounded cooldown - chicken can't fly again until this expires
+	grounded_cooldown = grounded_cooldown_time
 	
 	# Find a new landing spot different from where we jumped
 	var landing_spots = []
@@ -140,45 +155,30 @@ func try_spawn_egg():
 		# Add to the scene
 		main.get_node("Collectibles").add_child(egg)
 
-# Chicken movement pattern
-func get_movement_position(snake_head_pos):
-	# Initialize movement pattern if empty
-	if movement_pattern.size() == 0:
-		initialize_movement_pattern()
+# New movement function - random with 50% chance to return to previous position
+func get_random_movement_with_return(snake_head_pos):
+	# 50% chance to return to the previous position if we've moved
+	if grid_pos != previous_pos and randf() < 0.5:
+		is_returning = true
+		return previous_pos
 	
-	# Move toward target position
-	if grid_pos == target_position:
-		# Switch target
-		if target_position == movement_pattern[0]:
-			target_position = movement_pattern[1]
-		else:
-			target_position = movement_pattern[0]
+	# Otherwise, choose a random direction
+	is_returning = false
+	var directions = [
+		Vector2i(1, 0),   # Right
+		Vector2i(-1, 0),  # Left
+		Vector2i(0, 1),   # Down
+		Vector2i(0, -1)   # Up
+	]
 	
-	# Move one step toward target
-	return move_toward_pos(grid_pos, target_position)
-
-# Initialize a back-and-forth movement pattern
-func initialize_movement_pattern():
-	# Create pattern (3-5 spaces in each direction)
-	var start_pos = grid_pos
-	var direction = Vector2i(1, 0)  # Default horizontal
+	# Shuffle directions
+	directions.shuffle()
 	
-	# Check which direction has more space
-	var horizontal_space = min(grid_pos.x - 1, grid.grid_size.x - 2 - grid_pos.x)
-	var vertical_space = min(grid_pos.y - 1, grid.grid_size.y - 2 - grid_pos.y)
+	# Try each direction until we find a valid one
+	for dir in directions:
+		var new_pos = grid_pos + dir
+		if is_position_valid(new_pos):
+			return new_pos
 	
-	if vertical_space > horizontal_space:
-		direction = Vector2i(0, 1)  # Vertical movement
-	
-	var pattern_length = 3 + randi() % 3
-	var end_pos = Vector2i(
-		grid_pos.x + direction.x * pattern_length,
-		grid_pos.y + direction.y * pattern_length
-	)
-	
-	# Ensure end position is valid
-	end_pos.x = clamp(end_pos.x, 1, grid.grid_size.x - 2)
-	end_pos.y = clamp(end_pos.y, 1, grid.grid_size.y - 2)
-	
-	movement_pattern = [start_pos, end_pos]
-	target_position = end_pos
+	# If no valid directions, stay in place
+	return grid_pos
