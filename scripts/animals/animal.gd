@@ -14,6 +14,7 @@ var facing_direction = Vector2i(1, 0) # Default facing right
 # For chicken animation
 var is_flying = false
 var flying_cooldown = 0
+var jump_pos = Vector2i() # Added to store the position of a jump
 
 # References to other nodes
 var grid
@@ -62,9 +63,9 @@ func update_sprite_direction():
 		# Default sprite orientation is typically facing left
 		pass
 	elif facing_direction.y > 0:  # Down
-		$Sprite2D.rotation = deg_to_rad(90)
-	elif facing_direction.y < 0:  # Up
 		$Sprite2D.rotation = deg_to_rad(-90)
+	elif facing_direction.y < 0:  # Up
+		$Sprite2D.rotation = deg_to_rad(90)
 
 # Check if a position is valid (not occupied by other animals, snake, or walls)
 # The pos parameter is the position to check
@@ -159,3 +160,25 @@ func destroy_resource(collectible):
 	
 	# Remove the collectible
 	collectible.queue_free()
+
+# Find the nearest resource that this animal can destroy
+# This was missing from the base class and causing the error
+func find_nearest_destroyable_resource(curr_pos, max_distance):
+	var collectibles_node = main.get_node("Collectibles")
+	var nearest_resource = null
+	var min_distance = max_distance + 1  # Beyond our search range
+	
+	# Check all collectibles
+	for collectible in collectibles_node.get_children():
+		# Skip if not a destroyable resource or if it's another animal
+		if collectible.is_animal or not (collectible.resource_type in destroys):
+			continue
+		
+		var resource_pos = grid.world_to_grid(collectible.position)
+		var distance = (resource_pos - curr_pos).length()
+		
+		if distance < min_distance:
+			min_distance = distance
+			nearest_resource = collectible
+	
+	return nearest_resource

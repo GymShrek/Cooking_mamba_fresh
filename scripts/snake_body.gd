@@ -1,4 +1,4 @@
-# scripts/snake/snake_body.gd
+# scripts/snake_body.gd
 extends Node2D
 
 var resource_type = ""

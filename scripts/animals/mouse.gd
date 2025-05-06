@@ -2,7 +2,9 @@
 extends Animal
 class_name MouseAnimal
 
-var detection_range = 5 # Detection range for resources
+# Make these properties exportable so they can be modified in the Godot UI
+@export var detection_range: int = 3  # Detection range for resources
+@export var flee_distance: int = 2    # Distance to flee from snake
 
 func _ready():
 	super()
@@ -92,7 +94,7 @@ func follow_perimeter(curr_pos, snake_head_pos):
 	
 	if valid_moves.size() > 0:
 		# Try to move away from snake if it's close
-		if snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - curr_pos).length() < 3:
+		if snake_head_pos != Vector2i(-1, -1) and (snake_head_pos - curr_pos).length() < flee_distance:
 			# Sort moves by distance from snake head (furthest first)
 			valid_moves.sort_custom(func(a, b): 
 				var dist_a = (a - snake_head_pos).length()
@@ -105,46 +107,3 @@ func follow_perimeter(curr_pos, snake_head_pos):
 			return valid_moves[randi() % valid_moves.size()]
 	
 	return curr_pos  # Stay in place if no valid moves
-
-# Find the nearest resource that this animal can destroy
-func find_nearest_destroyable_resource(curr_pos, max_distance):
-	var collectibles_node = main.get_node("Collectibles")
-	var nearest_resource = null
-	var min_distance = max_distance + 1  # Beyond our search range
-	
-	# First pass: check for any destroyable resources in range
-	for collectible in collectibles_node.get_children():
-		# Skip if not a destroyable resource
-		if collectible.is_animal or not (collectible.resource_type in destroys):
-			continue
-		
-		var resource_pos = grid.world_to_grid(collectible.position)
-		var distance = (resource_pos - curr_pos).length()
-		
-		if distance < min_distance:
-			min_distance = distance
-			nearest_resource = collectible
-	
-	# If we found a resource in range, check if there's a higher priority one
-	if nearest_resource:
-		var priority_index = destroys.find(nearest_resource.resource_type)
-		
-		# Second pass: look for higher priority resources
-		for collectible in collectibles_node.get_children():
-			if collectible.is_animal:
-				continue
-				
-			var this_priority = destroys.find(collectible.resource_type)
-			
-			# If this resource is higher priority
-			if this_priority != -1 and this_priority < priority_index:
-				var resource_pos = grid.world_to_grid(collectible.position)
-				var distance = (resource_pos - curr_pos).length()
-				
-				# Accept if it's within 1.5x the distance of our current nearest
-				if distance <= min_distance * 1.5 and distance <= max_distance:
-					min_distance = distance
-					nearest_resource = collectible
-					priority_index = this_priority
-	
-	return nearest_resource

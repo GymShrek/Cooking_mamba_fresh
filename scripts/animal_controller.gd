@@ -126,7 +126,7 @@ func find_valid_spawn_position(type):
 			# Create a temporary cow to check validity
 			var temp_cow = cow_scene.instantiate()
 			temp_cow.grid_pos = grid_pos
-			if temp_cow.is_position_valid(grid_pos):
+			if is_position_valid_for_animal(grid_pos):
 				temp_cow.queue_free()
 				return grid_pos
 			temp_cow.queue_free()
