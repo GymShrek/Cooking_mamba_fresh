@@ -62,9 +62,9 @@ func update_sprite_direction():
 		# Default sprite orientation is typically facing left
 		pass
 	elif facing_direction.y > 0:  # Down
-		$Sprite2D.rotation = deg_to_rad(90)
-	elif facing_direction.y < 0:  # Up
 		$Sprite2D.rotation = deg_to_rad(-90)
+	elif facing_direction.y < 0:  # Up
+		$Sprite2D.rotation = deg_to_rad(90)
 
 # Check if a position is valid (not occupied by other animals, snake, or walls)
 # The pos parameter is the position to check

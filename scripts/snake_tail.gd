@@ -1,4 +1,4 @@
-# scripts/snake/snake_tail.gd
+# scripts/snake_tail.gd
 extends Node2D
 
 func _ready():

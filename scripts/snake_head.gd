@@ -1,4 +1,4 @@
-# scripts/snake/snake_head.gd
+# scripts/snake_head.gd
 extends Node2D
 
 func _ready():
