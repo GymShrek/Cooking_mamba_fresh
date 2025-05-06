@@ -3,7 +3,7 @@ extends Animal
 class_name PigAnimal
 
 var current_dir = Vector2i()
-@export var detection_range: int = 5  # Changed from 8 to 5 as requested
+@export var detection_range: int = 5  # Detection range for resources
 var destroyable_resources = ["milk", "tomato", "lettuce", "wheat", "egg"] # Priority order
 
 func _ready():

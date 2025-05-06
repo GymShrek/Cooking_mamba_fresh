@@ -3,8 +3,8 @@ extends Animal
 class_name MouseAnimal
 
 # Make these properties exportable so they can be modified in the Godot UI
-@export var detection_range: int = 3  # Changed from 5 to 3 as requested
-@export var flee_distance: int = 2    # Changed from 3 to 2 as requested
+@export var detection_range: int = 3  # Detection range for resources
+@export var flee_distance: int = 2    # Distance to flee from snake
 
 func _ready():
 	super()
