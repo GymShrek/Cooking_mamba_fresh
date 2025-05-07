@@ -13,7 +13,7 @@ var skins = {
 		"head": "res://assets/mamba_head.png",
 		"body": "res://assets/mamba_mid_full.png",
 		"tail": "res://assets/mamba_tail.png",
-		"body_multi": "res://assets/mamba_mid_multi.png"
+		"body_multi": "res://assets/mamba_mid_multi.png"  # Ensure this is used for multi-animal parts
 	}
 	# Additional skins can be added here
 	# "other_skin": {
@@ -33,9 +33,14 @@ var resource_textures = {
 	"egg": "res://assets/egg_snake.png",
 	"milk": "res://assets/milk_snake.png",
 	
-	# Animals - Front/Back pairs for double-width resources
-	"cow_front": "res://assets/cow_snake_front.png",
-	"cow_back": "res://assets/cow_snake_back.png",
+	# Animals - Front/Back pairs for multi-cell resources
+	"cow1-1": "res://assets/cow1-1_snake.png",
+	"cow1-2": "res://assets/cow1-2_snake.png",
+	"cow2-1": "res://assets/cow2-1_snake.png",
+	"cow2-2": "res://assets/cow2-2_snake.png",
+	
+	"pig1-1": "res://assets/pig1-1_snake.png",
+	"pig2-1": "res://assets/pig2-1_snake.png",
 	
 	# Regular animal resources
 	"mouse": "res://assets/mouse_snake.png",
