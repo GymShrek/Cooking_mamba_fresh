@@ -9,9 +9,9 @@ var current_dir = Vector2i(1, 0)
 var front_part_eaten = false
 var back_part_eaten = false
 
-# Textures for different parts
-var front_texture
-var back_texture
+# Textures for different parts - declare these at the class level
+var front_texture = null
+var back_texture = null
 
 func _ready():
 	super()
@@ -31,9 +31,17 @@ func _ready():
 	main_pivot = Vector2i(0, 0)  # Front is main pivot
 
 func setup_sprite():
-	# Load textures for each part
+	# Load textures for each part - use proper error handling
 	front_texture = load("res://assets/pig1-1.png")
+	if front_texture == null:
+		push_error("Failed to load pig1-1.png")
+		
 	back_texture = load("res://assets/pig2-1.png")
+	if back_texture == null:
+		push_error("Failed to load pig2-1.png")
+	
+	# Print confirmation when textures are loaded
+	print("Pig textures loaded: ", front_texture != null, back_texture != null)
 	
 	# Initially hide the main sprite since we'll use separate sprites for parts
 	if has_node("Sprite2D"):
@@ -49,11 +57,21 @@ func initialize_multi_cell():
 		Vector2i(1, 0)   # Back part
 	]
 	
+	# Make sure textures are valid
+	if front_texture == null or back_texture == null:
+		push_error("Pig textures not loaded properly")
+	
 	# Initialize the multi-cell sprites
 	initialize_multi_cell_sprites(textures, positions)
 	
-	# Update initial appearance
+	# Update initial appearance and make sure parts are visible
 	update_part_positions()
+	
+	# Explicitly ensure parts are visible
+	for part in parts:
+		part.visible = true
+	
+	print("Pig parts initialized: ", parts.size(), " parts")
 
 func move():
 	# Don't move if we've been eaten
@@ -213,21 +231,21 @@ func handle_part_eaten(pos):
 	# For horizontal orientation
 	if facing_direction.x != 0:
 		if local_pos == Vector2i(0, 0):
-			front_part_eaten = true
+			self.front_part_eaten = true
 			if parts.size() > 0:
 				parts[0].visible = false
 		elif local_pos == Vector2i(1, 0):
-			back_part_eaten = true
+			self.back_part_eaten = true
 			if parts.size() > 1:
 				parts[1].visible = false
 	else:  # For vertical orientation
 		if local_pos == Vector2i(0, 0):
-			front_part_eaten = true
+			self.front_part_eaten = true
 			if parts.size() > 0:
 				parts[0].visible = false
 		elif local_pos == Vector2i(0, 1) or local_pos == Vector2i(0, -1):
 			# The second part is either below or above depending on direction
-			back_part_eaten = true
+			self.back_part_eaten = true
 			if parts.size() > 1:
 				parts[1].visible = false
 	
@@ -236,5 +254,5 @@ func handle_part_eaten(pos):
 	can_move = false  # Stop movement for the current turn
 	
 	# Check if all parts are eaten
-	if front_part_eaten and back_part_eaten:
+	if self.front_part_eaten and self.back_part_eaten:
 		queue_free()

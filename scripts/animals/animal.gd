@@ -1,4 +1,3 @@
-# Comprehensive fix for animal.gd 
 # scripts/animals/animal.gd
 
 extends Node2D
@@ -37,8 +36,27 @@ var grid
 var main
 var snake
 
+# Debug function to list all files in a directory
+func list_files_in_dir(directory_path):
+	var dir = DirAccess.open(directory_path)
+	if dir:
+		print("Contents of directory: " + directory_path)
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			if not dir.current_is_dir():
+				print("- " + file_name)
+			file_name = dir.get_next()
+		dir.list_dir_end()
+	else:
+		print("Could not open directory: " + directory_path)
+		print("Error code: " + str(DirAccess.get_open_error()))
+
+
+
 func _ready():
 	# Wait until we're added to the scene before trying to access other nodes
+	list_files_in_dir("res://assets")
 	if not is_inside_tree():
 		await ready
 	
@@ -68,6 +86,22 @@ func initialize_references():
 	# Now that references are set up, initialize multi-cell if needed
 	if is_multi_cell:
 		initialize_multi_cell()
+		
+		
+# Helper function to safely load textures with error handling
+func safe_load_texture(path):
+	var texture = load(path)
+	if texture == null:
+		push_error("Failed to load texture: " + path)
+		# Check if the file exists
+		var file = FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			push_error("File does not exist: " + path)
+			# Print the error code
+			push_error("Error code: " + str(FileAccess.get_open_error()))
+		return null
+	return texture
+
 
 func setup_sprite():
 	# Override in child classes to set up specific animal sprites
@@ -84,6 +118,41 @@ func initialize_multi_cell_sprites(textures, positions):
 			child.queue_free()
 	
 	parts.clear()
+	
+	# Debug output
+	print(name + ": Initializing multi-cell sprites with " + str(textures.size()) + " textures")
+	
+	# Create part sprites based on provided textures and positions
+	for i in range(textures.size()):
+		var part = Sprite2D.new()
+		
+		# Check if the texture is valid
+		if textures[i] == null:
+			push_error(name + ": Texture " + str(i) + " is null!")
+			part.texture = preload("res://icon.svg")  # Use fallback texture
+		else:
+			part.texture = textures[i]
+			
+		part.name = "Part" + str(i)
+		
+		# Set initial position based on the grid layout
+		if grid != null:
+			var offset = Vector2(positions[i].x * grid.CELL_SIZE, positions[i].y * grid.CELL_SIZE)
+			part.position = offset
+		else:
+			push_error(name + ": Grid reference is null during multi-cell sprite initialization")
+			part.position = Vector2(i * 32, 0)  # Fallback for testing
+		
+		# Ensure the part is visible
+		part.visible = true
+		
+		add_child(part)
+		parts.append(part)
+		
+		print(name + ": Added part " + part.name + " at position " + str(part.position))
+	
+	# Update initial appearance
+	update_multi_cell_rotation()
 	
 	# Create part sprites based on provided textures and positions
 	for i in range(textures.size()):

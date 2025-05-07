@@ -20,16 +20,24 @@ var resource_textures = {
 	"milk": preload("res://assets/milk_snake.png"),
 	
 	# Animals - Front/Back pairs for double-width resources
-	"cow_front": preload("res://assets/cow_snake_front.png"),
-	"cow_back": preload("res://assets/cow_snake_back.png"),
+	"cow1-1": preload("res://assets/cow1-1_snake.png"),
+	"cow1-2": preload("res://assets/cow1-2_snake.png"),
+	"cow2-1": preload("res://assets/cow2-1_snake.png"),
+	"cow2-2": preload("res://assets/cow2-2_snake.png"),
+	
+	"pig1-1": preload("res://assets/pig1-1_snake.png"),
+	"pig2-1": preload("res://assets/pig2-1_snake.png"),
 	
 	# Regular animal resources
 	"mouse": preload("res://assets/mouse_snake.png"),
 	"chicken": preload("res://assets/chicken_snake.png"),
-	"pig": preload("res://assets/pig_snake.png")
+	"pig": preload("res://assets/pig_snake.png"),
+	"cow": preload("res://assets/cow_snake.png")
 }
 
 func _ready():
+	# Debug output to verify loaded textures
+	print("Snake body loaded for resource type: ", resource_type)
 	update_appearance()
 
 func set_carrying_food(value, type = ""):
@@ -37,6 +45,7 @@ func set_carrying_food(value, type = ""):
 	
 	if value and type:
 		resource_type = type
+		print("Snake body carrying food: ", type)
 	
 	update_appearance()
 
@@ -68,10 +77,15 @@ func update_appearance():
 			$ResourceSprite.texture = resource_textures[resource_type]
 			$ResourceSprite.visible = true
 			
+			# Print debug info 
+			print("Setting resource sprite texture for: ", resource_type, 
+				  " texture valid: ", $ResourceSprite.texture != null)
+			
 			# No region needed for the resource sprite - each has its own texture
 			$ResourceSprite.region_enabled = false
 		else:
 			# If we don't have a texture for this resource, hide the sprite
+			print("WARNING: No texture found for resource type: ", resource_type)
 			$ResourceSprite.visible = false
 	elif has_node("ResourceSprite"):
 		# If not carrying food, hide the resource sprite

@@ -5,17 +5,17 @@ class_name CowAnimal
 var milk_proximity_range = 8 # Tiles to stay within milk
 var move_counter = 0 # For moving every other turn
 
-# Part-specific damage flags
+# Part-specific damage flags - declare at class level with default values
 var part_1_1_eaten = false  # Bottom-left
 var part_1_2_eaten = false  # Top-left
 var part_2_1_eaten = false  # Bottom-right
 var part_2_2_eaten = false  # Top-right
 
-# Textures for different parts
-var texture_1_1  # Bottom-left
-var texture_1_2  # Top-left
-var texture_2_1  # Bottom-right
-var texture_2_2  # Top-right
+# Textures for different parts - declare at class level
+var texture_1_1 = null  # Bottom-left
+var texture_1_2 = null  # Top-left
+var texture_2_1 = null  # Bottom-right
+var texture_2_2 = null  # Top-right
 
 func _ready():
 	super()
@@ -37,17 +37,37 @@ func _ready():
 	main_pivot = Vector2i(0, 0)  # Bottom-left is main pivot
 
 func setup_sprite():
-	# Load textures for each part
+	# Load textures for each part with error checking
 	texture_1_1 = load("res://assets/cow1-1.png")
+	if texture_1_1 == null:
+		push_error("Failed to load cow1-1.png")
+		
 	texture_1_2 = load("res://assets/cow1-2.png")
+	if texture_1_2 == null:
+		push_error("Failed to load cow1-2.png")
+		
 	texture_2_1 = load("res://assets/cow2-1.png")
+	if texture_2_1 == null:
+		push_error("Failed to load cow2-1.png")
+		
 	texture_2_2 = load("res://assets/cow2-2.png")
+	if texture_2_2 == null:
+		push_error("Failed to load cow2-2.png")
+	
+	# Print confirmation when textures are loaded
+	print("Cow textures loaded: ", texture_1_1 != null, texture_1_2 != null, 
+		  texture_2_1 != null, texture_2_2 != null)
 	
 	# Initially hide the main sprite since we'll use separate sprites for parts
 	if has_node("Sprite2D"):
 		$Sprite2D.visible = false
 
 func initialize_multi_cell():
+	# Check if textures are loaded
+	if texture_1_1 == null or texture_1_2 == null or texture_2_1 == null or texture_2_2 == null:
+		push_error("Cow textures not loaded properly")
+		return
+		
 	# Create array of textures for the parts
 	var textures = [texture_1_1, texture_1_2, texture_2_1, texture_2_2]
 	
@@ -64,6 +84,12 @@ func initialize_multi_cell():
 	
 	# Update initial appearance
 	update_part_positions()
+	
+	# Explicitly ensure parts are visible
+	for part in parts:
+		part.visible = true
+	
+	print("Cow parts initialized: ", parts.size(), " parts")
 
 func move():
 	# Don't move if we've been eaten
@@ -71,8 +97,8 @@ func move():
 		return
 	
 	# Apply movement pattern based on damage state
-	var is_slow = (part_1_1_eaten or part_2_1_eaten) and not (part_1_1_eaten and part_2_1_eaten)
-	var is_fast = (part_1_2_eaten or part_2_2_eaten) and not (part_1_1_eaten and part_2_1_eaten and part_1_2_eaten and part_2_2_eaten)
+	var is_slow = (self.part_1_1_eaten or self.part_2_1_eaten) and not (self.part_1_1_eaten and self.part_2_1_eaten)
+	var is_fast = (self.part_1_2_eaten or self.part_2_2_eaten) and not (self.part_1_1_eaten and self.part_2_1_eaten and self.part_1_2_eaten and self.part_2_2_eaten)
 	
 	# Count movement cycles
 	move_counter += 1
@@ -96,7 +122,7 @@ func move():
 	var new_pos = grid_pos
 	
 	# Determine movement based on damage state
-	if (not part_1_2_eaten) and (not part_2_2_eaten):
+	if (not self.part_1_2_eaten) and (not self.part_2_2_eaten):
 		# Normal movement - follow milk
 		new_pos = move_based_on_milk(grid_pos)
 	else:
@@ -122,10 +148,10 @@ func update_part_positions():
 	# Update part positions based on relative positions and facing direction
 	for i in range(parts.size()):
 		# Skip parts that have been eaten
-		if (i == 0 and part_1_1_eaten) or \
-		   (i == 1 and part_1_2_eaten) or \
-		   (i == 2 and part_2_1_eaten) or \
-		   (i == 3 and part_2_2_eaten):
+		if (i == 0 and self.part_1_1_eaten) or \
+		   (i == 1 and self.part_1_2_eaten) or \
+		   (i == 2 and self.part_2_1_eaten) or \
+		   (i == 3 and self.part_2_2_eaten):
 			parts[i].visible = false
 			continue
 			
@@ -282,19 +308,19 @@ func handle_part_eaten(pos):
 	
 	# Determine which part was eaten based on local position
 	if local_pos == Vector2i(0, 0):
-		part_1_1_eaten = true
+		self.part_1_1_eaten = true
 		if parts.size() > 0:
 			parts[0].visible = false
 	elif local_pos == Vector2i(0, -1):
-		part_1_2_eaten = true
+		self.part_1_2_eaten = true
 		if parts.size() > 1:
 			parts[1].visible = false
 	elif local_pos == Vector2i(1, 0):
-		part_2_1_eaten = true
+		self.part_2_1_eaten = true
 		if parts.size() > 2:
 			parts[2].visible = false
 	elif local_pos == Vector2i(1, -1):
-		part_2_2_eaten = true
+		self.part_2_2_eaten = true
 		if parts.size() > 3:
 			parts[3].visible = false
 	
@@ -303,5 +329,5 @@ func handle_part_eaten(pos):
 	can_move = false  # Stop movement for the current turn
 	
 	# Check if all parts are eaten
-	if part_1_1_eaten and part_1_2_eaten and part_2_1_eaten and part_2_2_eaten:
+	if self.part_1_1_eaten and self.part_1_2_eaten and self.part_2_1_eaten and self.part_2_2_eaten:
 		queue_free()

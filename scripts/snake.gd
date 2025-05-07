@@ -341,6 +341,7 @@ func collect_resource(collectible):
 	var resource_type = ""
 	var is_animal = false
 	var is_multi_part = false
+	var specific_part = ""  # Track which specific part was eaten
 	
 	# Check if this is a multi-part animal part
 	if typeof(collectible) == TYPE_DICTIONARY and collectible.has("is_multi_part"):
@@ -352,14 +353,32 @@ func collect_resource(collectible):
 		if not is_instance_valid(animal):
 			return
 		
+		# Determine which specific part we're eating
+		if animal.type == "cow":
+			var local_pos = part_pos - animal.grid_pos
+			if local_pos == Vector2i(0, 0):  # Bottom-left
+				specific_part = "cow1-1"
+			elif local_pos == Vector2i(0, -1):  # Top-left
+				specific_part = "cow1-2"
+			elif local_pos == Vector2i(1, 0):  # Bottom-right
+				specific_part = "cow2-1"
+			elif local_pos == Vector2i(1, -1):  # Top-right
+				specific_part = "cow2-2"
+		elif animal.type == "pig":
+			var local_pos = part_pos - animal.grid_pos
+			if local_pos == Vector2i(0, 0):  # Front
+				specific_part = "pig1-1"
+			elif local_pos == Vector2i(1, 0) or local_pos == Vector2i(0, 1) or local_pos == Vector2i(0, -1):  # Back
+				specific_part = "pig2-1"
+		
 		# Handle multi-part animal collection
 		var animal_controller = get_parent().get_node("AnimalController")
 		if animal_controller:
 			# Notify the animal controller that a part was eaten
 			animal_controller.handle_animal_part_eaten(animal, part_pos)
 		
-		# Add the animal type to collected resources
-		resource_type = animal.type
+		# Add the specific part to collected resources
+		resource_type = specific_part if specific_part != "" else animal.type
 		is_animal = true
 		
 		# Create sparkle effect at the collision position
