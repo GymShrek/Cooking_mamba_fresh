@@ -12,7 +12,7 @@ var turn_delay = 0.2  # Match with snake's game_speed
 # Keep track of all animals
 var animals = []
 
-# Animal scenes
+# Animal scenes - ALL animals are handled through these scenes
 var mouse_scene = preload("res://scenes/animals/Mouse.tscn")
 var chicken_scene = preload("res://scenes/animals/Chicken.tscn")
 var pig_scene = preload("res://scenes/animals/Pig.tscn")
@@ -70,11 +70,9 @@ func spawn_animals(type, count):
 			# Set position based on grid
 			animal.grid_pos = grid_pos
 			
-			if type == "cow":
-				# Adjust position for center of 2x2 grid
-				animal.position = grid.grid_to_world(grid_pos) - Vector2(grid.CELL_SIZE/2, grid.CELL_SIZE/2)
-			else:
-				animal.position = grid.grid_to_world(grid_pos)
+			# For multi-cell animals, the position is handled by their internal code
+			# For single-cell animals, use the grid_pos directly
+			animal.position = grid.grid_to_world(grid_pos)
 			
 			# Add to scene and track
 			add_child(animal)
@@ -100,10 +98,17 @@ func find_valid_spawn_position(type):
 					grid_pos = Vector2i(1, randi_range(1, grid.grid_size.y - 2))
 			
 			"cow":
-				# Cow needs a 2x2 area, so check differently
+				# Cow needs a 2x2 area
 				grid_pos = Vector2i(
 					randi_range(1, grid.grid_size.x - 3),  # -3 to account for 2x2 size
 					randi_range(1, grid.grid_size.y - 3)
+				)
+			
+			"pig":
+				# Pig needs a 2x1 area
+				grid_pos = Vector2i(
+					randi_range(1, grid.grid_size.x - 3),  # -3 to account for 2x1 size
+					randi_range(1, grid.grid_size.y - 2)
 				)
 			
 			"fish":
@@ -121,54 +126,51 @@ func find_valid_spawn_position(type):
 					randi_range(1, grid.grid_size.y - 2)
 				)
 		
-		# Check if position is valid using appropriate method
-		if type == "cow":
-			# Create a temporary cow to check validity
-			var temp_cow = cow_scene.instantiate()
-			temp_cow.grid_pos = grid_pos
-			if is_position_valid_for_animal(grid_pos):
-				temp_cow.queue_free()
-				return grid_pos
-			temp_cow.queue_free()
-		elif type == "fish":
-			# TODO: Check if position is in water
-			if is_position_valid_for_animal(grid_pos):
-				return grid_pos
+		# Create a temporary animal to check position validity
+		var temp_animal
+		match type:
+			"cow":
+				temp_animal = cow_scene.instantiate()
+			"pig":
+				temp_animal = pig_scene.instantiate()
+			"mouse":
+				temp_animal = mouse_scene.instantiate()
+			"chicken":
+				temp_animal = chicken_scene.instantiate()
+			"fish":
+				temp_animal = fish_scene.instantiate()
+		
+		# Set the grid position
+		temp_animal.grid_pos = grid_pos
+		
+		# Check if position is valid using the animal's own validation method
+		var is_valid = false
+		if temp_animal.is_multi_cell:
+			is_valid = temp_animal.is_multi_cell_position_valid(grid_pos)
 		else:
-			if is_position_valid_for_animal(grid_pos):
-				return grid_pos
+			is_valid = temp_animal.is_position_valid(grid_pos)
+		
+		# Clean up the temporary animal
+		temp_animal.queue_free()
+		
+		if is_valid:
+			return grid_pos
 	
 	return Vector2i(-1, -1)  # No valid position found
-
-# Check if a position is valid for an animal (standard check)
-func is_position_valid_for_animal(pos):
-	# Check if the cell is vacant
-	if not grid.is_cell_vacant(pos):
-		return false
-	
-	# Check for collision with snake
-	for segment in snake.segments:
-		if segment.grid_pos == pos:
-			return false
-	
-	# Check for collision with existing animals
-	for animal in animals:
-		if animal.grid_pos == pos:
-			return false
-		
-		# Special case for cow (2x2 size)
-		if animal.type == "cow":
-			for x in range(2):
-				for y in range(2):
-					if animal.grid_pos + Vector2i(x, y) == pos:
-						return false
-	
-	return true
 
 # Move all animals
 func move_animals():
 	for animal in animals:
 		animal.move()
+
+# Handle animal part eaten by snake
+func handle_animal_part_eaten(animal, pos):
+	# Call the animal's specific handler
+	if animal.is_multi_cell:
+		animal.handle_part_eaten(pos)
+	else:
+		# For single-cell animals, just remove them
+		remove_animal(animal)
 
 # Remove an animal (when collected by snake)
 func remove_animal(animal):

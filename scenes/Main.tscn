@@ -1,10 +1,10 @@
 [gd_scene load_steps=6 format=3 uid="uid://qvybiyai4wut"]
 
-[ext_resource type="Script" uid="uid://tyf8aroyrcio" path="res://scripts/main.gd" id="1_rarhs"]
-[ext_resource type="Script" uid="uid://duiqbpjhuuveb" path="res://scripts/grid.gd" id="2_vcsgt"]
-[ext_resource type="Script" uid="uid://debsupsuyce8i" path="res://scripts/snake.gd" id="3_c01mt"]
-[ext_resource type="Script" uid="uid://c4qwgom0hsid" path="res://scripts/resource_counter.gd" id="4_nxtc6"]
-[ext_resource type="Script" uid="uid://cutj4cfm2lvhs" path="res://scripts/animal_controller.gd" id="5_y5grh"]
+[ext_resource type="Script" uid="uid://doqontdet0j3w" path="res://scripts/main.gd" id="1_rarhs"]
+[ext_resource type="Script" uid="uid://c7f4liuejnijg" path="res://scripts/grid.gd" id="2_vcsgt"]
+[ext_resource type="Script" uid="uid://crpvqk55vr7w1" path="res://scripts/snake.gd" id="3_c01mt"]
+[ext_resource type="Script" uid="uid://cf3jn2nlkimwf" path="res://scripts/resource_counter.gd" id="4_nxtc6"]
+[ext_resource type="Script" uid="uid://dvd45w5wvugf7" path="res://scripts/animal_controller.gd" id="5_y5grh"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_rarhs")
