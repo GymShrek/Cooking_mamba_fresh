@@ -3,12 +3,12 @@ extends Node2D
 
 var resource_type = ""
 var is_carrying_food = false
-var is_double_front = false  # First half of a double-width segment
-var is_double_back = false   # Second half of a double-width segment
+var is_multi_front = false  # First half of a multi-width segment
+var is_multi_back = false   # Second half of a multi-width segment
 
 # Standard textures
 var standard_body_texture = preload("res://assets/mamba_mid_full.png")
-var double_body_texture = preload("res://assets/mamba_mid_double.png")
+var multi_body_texture = preload("res://assets/mamba_mid_multi.png")
 
 # Resource textures dictionary - organized by resource types
 var resource_textures = {
@@ -19,20 +19,20 @@ var resource_textures = {
 	"egg": preload("res://assets/egg_snake.png"),
 	"milk": preload("res://assets/milk_snake.png"),
 	
-	# Animals - Front/Back pairs for double-width resources
+	# Cow parts - specific part textures
 	"cow1-1": preload("res://assets/cow1-1_snake.png"),
 	"cow1-2": preload("res://assets/cow1-2_snake.png"),
 	"cow2-1": preload("res://assets/cow2-1_snake.png"),
 	"cow2-2": preload("res://assets/cow2-2_snake.png"),
 	
+	# Pig parts - specific part textures
 	"pig1-1": preload("res://assets/pig1-1_snake.png"),
 	"pig2-1": preload("res://assets/pig2-1_snake.png"),
 	
 	# Regular animal resources
 	"mouse": preload("res://assets/mouse_snake.png"),
 	"chicken": preload("res://assets/chicken_snake.png"),
-	"pig": preload("res://assets/pig_snake.png"),
-	"cow": preload("res://assets/cow_snake.png")
+	"fish": preload("res://assets/fish_snake.png")
 }
 
 func _ready():
@@ -49,18 +49,18 @@ func set_carrying_food(value, type = ""):
 	
 	update_appearance()
 
-func set_is_double_front(value):
-	is_double_front = value
+func set_is_multi_front(value):
+	is_multi_front = value
 	update_appearance()
 
-func set_is_double_back(value):
-	is_double_back = value
+func set_is_multi_back(value):
+	is_multi_back = value
 	update_appearance()
 
 func update_appearance():
 	# Choose the appropriate base texture for the segment
-	if is_double_front or is_double_back:
-		$Sprite2D.texture = double_body_texture
+	if is_multi_front or is_multi_back:
+		$Sprite2D.texture = multi_body_texture
 	else:
 		$Sprite2D.texture = standard_body_texture
 	

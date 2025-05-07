@@ -13,14 +13,14 @@ var skins = {
 		"head": "res://assets/mamba_head.png",
 		"body": "res://assets/mamba_mid_full.png",
 		"tail": "res://assets/mamba_tail.png",
-		"body_double": "res://assets/mamba_mid_double.png"
+		"body_multi": "res://assets/mamba_mid_multi.png"
 	}
 	# Additional skins can be added here
 	# "other_skin": {
 	#   "head": "res://assets/other_head.png",
 	#   "body": "res://assets/other_mid_full.png",
 	#   "tail": "res://assets/other_tail.png", 
-	#   "body_double": "res://assets/other_mid_double.png"
+	#   "body_multi": "res://assets/other_mid_multi.png"
 	# }
 }
 
@@ -56,9 +56,9 @@ func get_body_texture():
 func get_tail_texture():
 	return load(skins[current_skin]["tail"])
 
-# Function to get the double-width body texture for the current skin
-func get_double_body_texture():
-	return load(skins[current_skin]["body_double"])
+# Function to get the multi-width body texture for the current skin
+func get_multi_body_texture():
+	return load(skins[current_skin]["body_multi"])
 
 # Function to get a resource texture
 func get_resource_texture(resource_type):
