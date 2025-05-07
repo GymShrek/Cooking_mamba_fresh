@@ -1,4 +1,6 @@
+# Comprehensive fix for animal.gd 
 # scripts/animals/animal.gd
+
 extends Node2D
 class_name Animal
 
@@ -18,6 +20,7 @@ var parts = []  # Will store parts for multi-cell animals
 var part_positions = []  # Relative positions of parts
 var main_pivot = Vector2i(0, 0)  # Pivot point for rotation (usually bottom-left)
 var has_missing_parts = false  # Flag when animal has had parts eaten
+var grid_offset = Vector2i(0, 0) # Offset for rendering parts with different rotations
 
 # Movement tracking
 var can_move = true
@@ -35,19 +38,33 @@ var main
 var snake
 
 func _ready():
-	# IMPORTANT: Wait until the node is ready before accessing parent nodes
-	call_deferred("initialize_references")
+	# Wait until we're added to the scene before trying to access other nodes
+	if not is_inside_tree():
+		await ready
+	
+	# Initialize references correctly
+	initialize_references()
 	
 	# Setup sprite
 	setup_sprite()
 
 func initialize_references():
-	# Initialize references safely after the node is ready
-	main = get_node("/root/Main")
+	# Get references to necessary nodes
+	# Use safe navigation to avoid errors
+	main = get_tree().get_root().get_node_or_null("Main")
 	if main:
-		grid = main.get_node("Grid")
-		snake = main.get_node("Snake")
+		grid = main.get_node_or_null("Grid")
+		snake = main.get_node_or_null("Snake")
 		
+		# Check if we got valid references
+		if grid == null:
+			push_error("Failed to get Grid reference in " + name)
+		if snake == null:
+			push_error("Failed to get Snake reference in " + name)
+	else:
+		push_error("Failed to get Main reference in " + name)
+		return
+	
 	# Now that references are set up, initialize multi-cell if needed
 	if is_multi_cell:
 		initialize_multi_cell()
@@ -59,6 +76,34 @@ func setup_sprite():
 func initialize_multi_cell():
 	# Override in child classes for specific multi-cell setup
 	pass
+
+func initialize_multi_cell_sprites(textures, positions):
+	# Clear existing parts
+	for child in get_children():
+		if child.name != "Sprite2D":  # Keep the main sprite
+			child.queue_free()
+	
+	parts.clear()
+	
+	# Create part sprites based on provided textures and positions
+	for i in range(textures.size()):
+		var part = Sprite2D.new()
+		part.texture = textures[i]
+		part.name = "Part" + str(i)
+		
+		# Set initial position based on the grid layout
+		if grid != null:
+			var offset = positions[i] * grid.CELL_SIZE
+			part.position = offset
+		else:
+			push_error("Grid reference is null during multi-cell sprite initialization")
+			part.position = Vector2(i * 32, 0)  # Fallback for testing
+		
+		add_child(part)
+		parts.append(part)
+	
+	# Update initial appearance
+	update_multi_cell_rotation()
 
 func move():
 	# Base movement logic - override in child classes
@@ -74,6 +119,10 @@ func update_facing_direction(new_pos):
 
 func update_sprite_direction():
 	# Simple single cell animal rotation
+	# First check if Sprite2D exists
+	if not has_node("Sprite2D"):
+		return
+		
 	# Reset rotation and flip
 	$Sprite2D.rotation = 0
 	$Sprite2D.flip_h = false
@@ -86,9 +135,9 @@ func update_sprite_direction():
 		# Default sprite orientation is typically facing left
 		pass
 	elif facing_direction.y > 0:  # Down
-		$Sprite2D.rotation = deg_to_rad(-90)
-	elif facing_direction.y < 0:  # Up
 		$Sprite2D.rotation = deg_to_rad(90)
+	elif facing_direction.y < 0:  # Up
+		$Sprite2D.rotation = deg_to_rad(-90)
 
 func update_multi_cell_rotation():
 	# Override in child classes to handle multi-cell rotations
@@ -98,7 +147,12 @@ func update_multi_cell_rotation():
 func is_position_valid(pos, ignore_resource_type = ""):
 	# Safety check - make sure grid is initialized
 	if grid == null:
-		push_error("Grid is null in is_position_valid check")
+		push_error("Grid is null in is_position_valid check for " + name)
+		return false
+	
+	# Safety check - make sure main is initialized
+	if main == null:
+		push_error("Main is null in is_position_valid check for " + name)
 		return false
 	
 	# Check if it's within the grid bounds and not a wall
@@ -112,7 +166,7 @@ func is_position_valid(pos, ignore_resource_type = ""):
 				return false
 	
 	# Check for collision with other animals
-	var collectibles_node = main.get_node("Collectibles") if main else null
+	var collectibles_node = main.get_node_or_null("Collectibles")
 	if collectibles_node:
 		for collectible in collectibles_node.get_children():
 			if collectible == self or collectible.resource_type == ignore_resource_type:
@@ -144,7 +198,7 @@ func is_position_valid(pos, ignore_resource_type = ""):
 func is_multi_cell_position_valid(base_pos):
 	# Safety check
 	if grid == null:
-		push_error("Grid is null in is_multi_cell_position_valid check")
+		push_error("Grid is null in is_multi_cell_position_valid check for " + name)
 		return false
 		
 	# For multi-cell animals, check every cell they would occupy
@@ -161,19 +215,31 @@ func get_world_part_position(base_pos, relative_pos):
 
 # Rotate a point around origin based on facing direction
 func rotate_point(point, direction):
-	var rotated = Vector2i()
+	var rotated = Vector2i(point.x, point.y)
+	
+	# Apply rotation based on facing direction
 	if direction == Vector2i(1, 0):  # Right
+		# For right-facing, we keep the same coordinates but flip the sprite
 		rotated = Vector2i(point.x, point.y)
 	elif direction == Vector2i(-1, 0):  # Left
-		rotated = Vector2i(-point.x, point.y)
+		# For left-facing, we use the original coordinates
+		rotated = Vector2i(point.x, point.y)
 	elif direction == Vector2i(0, 1):  # Down
+		# For down-facing, we swap x and y (rotate 90 degrees)
 		rotated = Vector2i(point.y, point.x)
 	elif direction == Vector2i(0, -1):  # Up
+		# For up-facing, we swap x and y and negate the new y (rotate -90 degrees)
 		rotated = Vector2i(point.y, -point.x)
+		
 	return rotated
 
 # Helper function to move toward a target position
 func move_toward_pos(curr_pos, target_pos):
+	# Check if grid is initialized
+	if grid == null:
+		push_error("Grid is null in move_toward_pos for " + name)
+		return curr_pos
+		
 	var diff = target_pos - curr_pos
 	var move_dir = Vector2i()
 	
@@ -184,11 +250,6 @@ func move_toward_pos(curr_pos, target_pos):
 		move_dir.y = 1 if diff.y > 0 else -1
 	
 	var next_pos = Vector2i(curr_pos.x + move_dir.x, curr_pos.y + move_dir.y)
-	
-	# Safety check
-	if grid == null:
-		push_error("Grid is null in move_toward_pos")
-		return curr_pos
 	
 	# For multi-cell animals, use the multi-cell validity check
 	if is_multi_cell:
@@ -223,18 +284,19 @@ func move_toward_pos(curr_pos, target_pos):
 func check_collectible_at_position(pos):
 	# Safety check
 	if main == null:
-		push_error("Main is null in check_collectible_at_position")
+		push_error("Main is null in check_collectible_at_position for " + name)
+		return null
+	
+	if grid == null:
+		push_error("Grid is null in check_collectible_at_position for " + name)
 		return null
 		
-	var collectibles_node = main.get_node("Collectibles")
+	var collectibles_node = main.get_node_or_null("Collectibles")
 	if collectibles_node == null:
 		return null
 	
 	for collectible in collectibles_node.get_children():
 		if collectible == self:
-			continue
-		
-		if grid == null:
 			continue
 			
 		var collectible_pos = grid.world_to_grid(collectible.position)
@@ -252,6 +314,7 @@ func can_destroy_resource(collectible):
 func destroy_resource(collectible):
 	# Safety check
 	if main == null:
+		push_error("Main is null in destroy_resource for " + name)
 		return
 		
 	# Create sparkle effect
@@ -264,9 +327,10 @@ func destroy_resource(collectible):
 func find_nearest_destroyable_resource(curr_pos, max_distance):
 	# Safety check
 	if main == null or grid == null:
+		push_error("Main or Grid is null in find_nearest_destroyable_resource for " + name)
 		return null
 		
-	var collectibles_node = main.get_node("Collectibles")
+	var collectibles_node = main.get_node_or_null("Collectibles")
 	if collectibles_node == null:
 		return null
 		
@@ -290,8 +354,51 @@ func find_nearest_destroyable_resource(curr_pos, max_distance):
 	
 # For multi-cell animals - check if a part at a specific position was eaten
 func handle_part_eaten(pos):
-	# This will be overridden in subclasses
-	pass
+	# Convert grid position to local animal coordinates
+	var local_pos = pos - grid_pos
+	
+	# Based on the animal type, determine which part was eaten
+	match type:
+		"cow":
+			# Cow is 2x2
+			if local_pos == Vector2i(0, 0):  # Bottom-left
+				self.part_1_1_eaten = true
+				parts[0].visible = false
+			elif local_pos == Vector2i(0, -1):  # Top-left
+				self.part_1_2_eaten = true
+				parts[1].visible = false
+			elif local_pos == Vector2i(1, 0):  # Bottom-right
+				self.part_2_1_eaten = true
+				parts[2].visible = false
+			elif local_pos == Vector2i(1, -1):  # Top-right
+				self.part_2_2_eaten = true
+				parts[3].visible = false
+		"pig":
+			# Pig is 2x1 (horizontal) or 1x2 (vertical)
+			if facing_direction.x != 0:  # Horizontal
+				if local_pos == Vector2i(0, 0):  # Front
+					self.front_part_eaten = true
+					parts[0].visible = false
+				elif local_pos == Vector2i(1, 0):  # Back
+					self.back_part_eaten = true
+					parts[1].visible = false
+			else:  # Vertical
+				if local_pos == Vector2i(0, 0):  # Front
+					self.front_part_eaten = true
+					parts[0].visible = false
+				elif local_pos == Vector2i(0, 1):  # Back
+					self.back_part_eaten = true
+					parts[1].visible = false
+	
+	# Set flags for damaged state
+	has_missing_parts = true
+	can_move = false  # Stop movement for current turn
+	
+	# If all parts eaten, queue_free this animal
+	if type == "cow" and self.part_1_1_eaten and self.part_1_2_eaten and self.part_2_1_eaten and self.part_2_2_eaten:
+		queue_free()
+	elif type == "pig" and self.front_part_eaten and self.back_part_eaten:
+		queue_free()
 
 # Check all positions for resources to destroy (multi-cell animal)
 func check_multi_cell_destroy_resources():

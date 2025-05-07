@@ -291,26 +291,51 @@ func check_collectible_collision(pos: Vector2i):
 	var animal_controller = get_parent().get_node("AnimalController")
 	if animal_controller:
 		for animal in animal_controller.animals:
+			# Skip if animal is invalid
+			if not is_instance_valid(animal):
+				continue
+				
 			# Skip chickens that are flying
 			if animal.type == "chicken" and animal.is_flying:
 				continue
 				
 			# For multi-cell animals, check all parts
 			if animal.is_multi_cell:
+				# Check if each part position matches the collision position
 				for part_pos in animal.part_positions:
 					var world_part_pos = animal.get_world_part_position(animal.grid_pos, part_pos)
+					
 					if world_part_pos == pos:
-						# Create a custom result that includes the animal and position
-						return {
-							"animal": animal,
-							"part_pos": pos,
-							"is_multi_part": true
-						}
+						# Skip parts that have already been eaten
+						var part_already_eaten = false
+						
+						# Check cow parts
+						if animal.type == "cow":
+							if (part_pos == Vector2i(0, 0) and animal.part_1_1_eaten) or \
+							   (part_pos == Vector2i(0, -1) and animal.part_1_2_eaten) or \
+							   (part_pos == Vector2i(1, 0) and animal.part_2_1_eaten) or \
+							   (part_pos == Vector2i(1, -1) and animal.part_2_2_eaten):
+								part_already_eaten = true
+						
+						# Check pig parts
+						elif animal.type == "pig":
+							if (part_pos == Vector2i(0, 0) and animal.front_part_eaten) or \
+							   (part_pos == Vector2i(1, 0) and animal.back_part_eaten):
+								part_already_eaten = true
+						
+						if not part_already_eaten:
+							# Create a custom result with the animal and position
+							return {
+								"animal": animal,
+								"part_pos": pos,
+								"is_multi_part": true
+							}
 			# For regular animals
 			elif animal.grid_pos == pos:
 				return animal
 	
 	return null
+
 
 func collect_resource(collectible):
 	var resource_type = ""
@@ -322,6 +347,10 @@ func collect_resource(collectible):
 		is_multi_part = true
 		var animal = collectible.animal
 		var part_pos = collectible.part_pos
+		
+		# Make sure the animal is valid
+		if not is_instance_valid(animal):
+			return
 		
 		# Handle multi-part animal collection
 		var animal_controller = get_parent().get_node("AnimalController")
@@ -368,7 +397,7 @@ func collect_resource(collectible):
 	emit_signal("resource_collected", resource_type)
 	
 	# Create sparkle effect at the collectible's position
-	get_parent().create_sparkle_effect(collectible.position if collectible is Animal else collectible.position)
+	get_parent().create_sparkle_effect(collectible.position)
 	
 	# Grow the snake with a new segment
 	grow_snake_with_food(resource_type)

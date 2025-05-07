@@ -27,66 +27,43 @@ func _ready():
 	is_multi_cell = true
 	size = Vector2i(2, 2)  # 2x2 grid cells
 	
-	# Initialize multi-cell parameters
+	# Initialize multi-cell parameters - define the relative positions of each part
 	part_positions = [
 		Vector2i(0, 0),  # Bottom-left (1-1)
-		Vector2i(0, 1),  # Top-left (1-2)
+		Vector2i(0, -1), # Top-left (1-2)
 		Vector2i(1, 0),  # Bottom-right (2-1)
-		Vector2i(1, 1)   # Top-right (2-2)
+		Vector2i(1, -1)  # Top-right (2-2)
 	]
 	main_pivot = Vector2i(0, 0)  # Bottom-left is main pivot
 
 func setup_sprite():
-	# We use a custom sprite setup for multi-cell animals
-	# Main node will have no sprite, instead we create child nodes
-	
-	# Load part textures
+	# Load textures for each part
 	texture_1_1 = load("res://assets/cow1-1.png")
 	texture_1_2 = load("res://assets/cow1-2.png")
 	texture_2_1 = load("res://assets/cow2-1.png")
 	texture_2_2 = load("res://assets/cow2-2.png")
 	
-	# Create part nodes
-	initialize_multi_cell()
+	# Initially hide the main sprite since we'll use separate sprites for parts
+	if has_node("Sprite2D"):
+		$Sprite2D.visible = false
 
 func initialize_multi_cell():
-	# Create part sprites
-	parts.clear()
+	# Create array of textures for the parts
+	var textures = [texture_1_1, texture_1_2, texture_2_1, texture_2_2]
 	
-	# Create bottom-left part (1-1)
-	var part_1_1 = Sprite2D.new()
-	part_1_1.texture = texture_1_1
-	part_1_1.name = "Cow1-1"
-	part_1_1.position = Vector2(0, 0)  # Local position
-	add_child(part_1_1)
-	parts.append(part_1_1)
+	# Create positions array for initialization
+	var positions = [
+		Vector2i(0, 0),       # Bottom-left at (0,0)
+		Vector2i(0, -1),      # Top-left at (0,-1)
+		Vector2i(1, 0),       # Bottom-right at (1,0)
+		Vector2i(1, -1)       # Top-right at (1,-1)
+	]
 	
-	# Create top-left part (1-2)
-	var part_1_2 = Sprite2D.new()
-	part_1_2.texture = texture_1_2
-	part_1_2.name = "Cow1-2"
-	part_1_2.position = Vector2(0, -grid.CELL_SIZE)  # Position above bottom-left
-	add_child(part_1_2)
-	parts.append(part_1_2)
-	
-	# Create bottom-right part (2-1)
-	var part_2_1 = Sprite2D.new()
-	part_2_1.texture = texture_2_1
-	part_2_1.name = "Cow2-1"
-	part_2_1.position = Vector2(grid.CELL_SIZE, 0)  # Position to right of bottom-left
-	add_child(part_2_1)
-	parts.append(part_2_1)
-	
-	# Create top-right part (2-2)
-	var part_2_2 = Sprite2D.new()
-	part_2_2.texture = texture_2_2
-	part_2_2.name = "Cow2-2"
-	part_2_2.position = Vector2(grid.CELL_SIZE, -grid.CELL_SIZE)  # Position diagonal from bottom-left
-	add_child(part_2_2)
-	parts.append(part_2_2)
+	# Initialize the multi-cell sprites
+	initialize_multi_cell_sprites(textures, positions)
 	
 	# Update initial appearance
-	update_multi_cell_rotation()
+	update_part_positions()
 
 func move():
 	# Don't move if we've been eaten
@@ -111,6 +88,10 @@ func move():
 			return
 	# Fast cow (when top parts are eaten) moves every turn, no counter check needed
 	
+	# Safety checks
+	if grid == null or main == null or snake == null:
+		return
+	
 	var snake_head_pos = snake.segments[0].grid_pos
 	var new_pos = grid_pos
 	
@@ -130,30 +111,56 @@ func move():
 		check_multi_cell_destroy_resources()
 		
 		grid_pos = new_pos
+		position = grid.grid_to_world(grid_pos)
 		update_part_positions()
 
 # Update visual positions of all parts based on grid_pos and rotation
 func update_part_positions():
-	# Don't update parts that have been eaten
-	if part_1_1_eaten and parts.size() > 0:
-		parts[0].hide()
-	if part_1_2_eaten and parts.size() > 1:
-		parts[1].hide()
-	if part_2_1_eaten and parts.size() > 2:
-		parts[2].hide()
-	if part_2_2_eaten and parts.size() > 3:
-		parts[3].hide()
+	# First update the main position
+	position = grid.grid_to_world(grid_pos)
 	
-	# Update positions of remaining parts
+	# Update part positions based on relative positions and facing direction
 	for i in range(parts.size()):
-		if (i == 0 and part_1_1_eaten) or (i == 1 and part_1_2_eaten) or \
-		   (i == 2 and part_2_1_eaten) or (i == 3 and part_2_2_eaten):
+		# Skip parts that have been eaten
+		if (i == 0 and part_1_1_eaten) or \
+		   (i == 1 and part_1_2_eaten) or \
+		   (i == 2 and part_2_1_eaten) or \
+		   (i == 3 and part_2_2_eaten):
+			parts[i].visible = false
 			continue
 			
-		var part_pos = part_positions[i]
-		var world_part_pos = get_world_part_position(grid_pos, part_pos)
-		var pixel_pos = grid.grid_to_world(world_part_pos)
-		parts[i].position = pixel_pos - position  # Convert to local position
+		parts[i].visible = true
+		
+		# Position each part relative to the main node
+		var local_pos = Vector2.ZERO
+		match i:
+			0: # Bottom-left
+				local_pos = Vector2(0, 0)
+			1: # Top-left 
+				local_pos = Vector2(0, -grid.CELL_SIZE)
+			2: # Bottom-right
+				local_pos = Vector2(grid.CELL_SIZE, 0)
+			3: # Top-right
+				local_pos = Vector2(grid.CELL_SIZE, -grid.CELL_SIZE)
+		
+		parts[i].position = local_pos
+
+# Override to handle multi-cell rotation
+func update_multi_cell_rotation():
+	# Set all parts to correct visuals based on facing direction
+	for part in parts:
+		part.rotation = 0
+		part.flip_h = false
+		part.flip_v = false
+	
+	if facing_direction.x > 0:  # Right
+		# Flip horizontally for all parts
+		for part in parts:
+			part.flip_h = true
+	# For all other directions, we keep the default appearance
+	
+	# Update the positions of all parts
+	update_part_positions()
 
 # Cow movement: follows milk if top parts intact, moves recklessly if top parts eaten
 func move_based_on_milk(curr_pos):
@@ -229,7 +236,7 @@ func move_recklessly(curr_pos, is_fast):
 	directions.shuffle()
 	
 	# For fast movement (top parts eaten), try to move multiple steps
-	var steps = 4 if is_fast else 1
+	var steps = 2 if is_fast else 1
 	
 	# Try each direction with the specified number of steps
 	for dir in directions:
@@ -239,11 +246,6 @@ func move_recklessly(curr_pos, is_fast):
 		
 		# If we can't move the full distance, try a shorter one
 		if steps > 1:
-			new_pos = curr_pos + (dir * (steps / 2))
-			if is_multi_cell_position_valid(new_pos):
-				return new_pos
-				
-			# Try a single step as last resort
 			new_pos = curr_pos + dir
 			if is_multi_cell_position_valid(new_pos):
 				return new_pos
@@ -253,7 +255,13 @@ func move_recklessly(curr_pos, is_fast):
 
 # Find the nearest milk resource
 func find_nearest_milk():
-	var collectibles_node = main.get_node("Collectibles")
+	if main == null:
+		return null
+		
+	var collectibles_node = main.get_node_or_null("Collectibles")
+	if collectibles_node == null:
+		return null
+		
 	var nearest_milk = null
 	var min_distance = 999999
 	
@@ -267,59 +275,33 @@ func find_nearest_milk():
 	
 	return nearest_milk
 
-# Override to handle multi-cell rotation
-func update_multi_cell_rotation():
-	# Cow only rotates for left/right, not up/down (as specified)
-	# This makes it always appear as a 2x2 square regardless of facing direction
-	
-	# Reset all rotations and flips
-	for part in parts:
-		part.rotation = 0
-		part.flip_h = false
-		part.flip_v = false
-	
-	if facing_direction.x > 0:  # Right
-		# Flip horizontally
-		for part in parts:
-			part.flip_h = true
-	elif facing_direction.x < 0:  # Left
-		# Default cow orientation is facing left - no change needed
-		pass
-	
-	# For up/down, we keep the same visual appearance but update part positions
-	# to account for the direction of movement
-	
-	# Update positions of parts
-	update_part_positions()
-
-# Handle part eaten
+# Override handle_part_eaten to properly handle cow parts
 func handle_part_eaten(pos):
-	var world_part_pos = get_world_part_position(grid_pos, Vector2i(0, 0))
-	var offset = pos - world_part_pos
+	# Convert global position to local position relative to cow
+	var local_pos = pos - grid_pos
 	
-	# Check which part was eaten based on its relative position
-	if offset == Vector2i(0, 0):  # Bottom-left (1-1)
+	# Determine which part was eaten based on local position
+	if local_pos == Vector2i(0, 0):
 		part_1_1_eaten = true
-		parts[0].visible = false
-		has_missing_parts = true
-	elif offset == Vector2i(0, -1) or offset == Vector2i(0, 1):  # Top-left (1-2)
+		if parts.size() > 0:
+			parts[0].visible = false
+	elif local_pos == Vector2i(0, -1):
 		part_1_2_eaten = true
-		parts[1].visible = false
-		has_missing_parts = true
-	elif offset == Vector2i(1, 0):  # Bottom-right (2-1)
+		if parts.size() > 1:
+			parts[1].visible = false
+	elif local_pos == Vector2i(1, 0):
 		part_2_1_eaten = true
-		parts[2].visible = false
-		has_missing_parts = true
-	elif offset == Vector2i(1, -1) or offset == Vector2i(1, 1):  # Top-right (2-2)
+		if parts.size() > 2:
+			parts[2].visible = false
+	elif local_pos == Vector2i(1, -1):
 		part_2_2_eaten = true
-		parts[3].visible = false
-		has_missing_parts = true
+		if parts.size() > 3:
+			parts[3].visible = false
 	
-	# If all parts eaten, queue_free the whole animal
+	# Set flags for damage state
+	has_missing_parts = true
+	can_move = false  # Stop movement for the current turn
+	
+	# Check if all parts are eaten
 	if part_1_1_eaten and part_1_2_eaten and part_2_1_eaten and part_2_2_eaten:
 		queue_free()
-		return
-	
-	# Apply appropriate behavior changes
-	can_move = false  # Stop movement for the turn
-	move_counter = 0  # Reset movement counter

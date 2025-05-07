@@ -25,44 +25,35 @@ func _ready():
 	
 	# Initialize multi-cell parameters
 	part_positions = [
-		Vector2i(0, 0),  # Front part (1-1)
-		Vector2i(1, 0)   # Back part (2-1)
+		Vector2i(0, 0),  # Front part
+		Vector2i(1, 0)   # Back part
 	]
 	main_pivot = Vector2i(0, 0)  # Front is main pivot
 
 func setup_sprite():
-	# We use a custom sprite setup for multi-cell animals
-	# Main node will have no sprite, instead we create child nodes
-	
-	# Load part textures
+	# Load textures for each part
 	front_texture = load("res://assets/pig1-1.png")
 	back_texture = load("res://assets/pig2-1.png")
 	
-	# Create part nodes
-	initialize_multi_cell()
+	# Initially hide the main sprite since we'll use separate sprites for parts
+	if has_node("Sprite2D"):
+		$Sprite2D.visible = false
 
 func initialize_multi_cell():
-	# Create part sprites
-	parts.clear()
+	# Create array of textures for the parts
+	var textures = [front_texture, back_texture]
 	
-	# Create front part (1-1)
-	var front_part = Sprite2D.new()
-	front_part.texture = front_texture
-	front_part.name = "PigFront"
-	front_part.position = Vector2(0, 0)  # Local position
-	add_child(front_part)
-	parts.append(front_part)
+	# Create positions array for initialization - will be updated based on rotation
+	var positions = [
+		Vector2i(0, 0),  # Front part
+		Vector2i(1, 0)   # Back part
+	]
 	
-	# Create back part (2-1)
-	var back_part = Sprite2D.new()
-	back_part.texture = back_texture
-	back_part.name = "PigBack"
-	back_part.position = Vector2(grid.CELL_SIZE, 0)  # Position to right of front
-	add_child(back_part)
-	parts.append(back_part)
+	# Initialize the multi-cell sprites
+	initialize_multi_cell_sprites(textures, positions)
 	
 	# Update initial appearance
-	update_multi_cell_rotation()
+	update_part_positions()
 
 func move():
 	# Don't move if we've been eaten
@@ -75,12 +66,16 @@ func move():
 		if move_cooldown < 2:  # Move every other turn when damaged
 			return
 		move_cooldown = 0
+	
+	# Safety checks
+	if grid == null or main == null or snake == null:
+		return
 		
 	var snake_head_pos = snake.segments[0].grid_pos
 	var new_pos = grid_pos
 	
-	# Check for resources to destroy (only if back part intact)
-	if not front_part_eaten:
+	# Check for resources to destroy (only if both parts are intact)
+	if not front_part_eaten and not back_part_eaten:
 		var nearest_resource = find_nearest_destroyable_resource(grid_pos, detection_range)
 		if nearest_resource:
 			var resource_pos = grid.world_to_grid(nearest_resource.position)
@@ -88,7 +83,7 @@ func move():
 		else:
 			new_pos = move_linear(grid_pos)
 	else:
-		# If front part is eaten, just move linearly without seeking resources
+		# If any part is eaten, just move linearly
 		new_pos = move_linear(grid_pos)
 	
 	# Update facing direction and position
@@ -96,29 +91,46 @@ func move():
 		update_facing_direction(new_pos)
 		
 		# Check for and destroy any collectibles at new positions
-		if not back_part_eaten:  # Only destroy resources if back part is intact
+		if not front_part_eaten and not back_part_eaten:
 			check_multi_cell_destroy_resources()
 		
 		grid_pos = new_pos
+		position = grid.grid_to_world(grid_pos)
 		update_part_positions()
 
 # Update visual positions of all parts based on grid_pos and rotation
 func update_part_positions():
-	# Don't update parts that have been eaten
+	# Update part visibilities first
 	if front_part_eaten and parts.size() > 0:
-		parts[0].hide()
+		parts[0].visible = false
 	if back_part_eaten and parts.size() > 1:
-		parts[1].hide()
+		parts[1].visible = false
+	
+	# Position the parts based on facing direction
+	if facing_direction.x != 0:  # Horizontal orientation
+		if parts.size() > 0:
+			parts[0].position = Vector2(0, 0)
+			parts[0].rotation = 0
+		if parts.size() > 1:
+			parts[1].position = Vector2(grid.CELL_SIZE, 0)
+			parts[1].rotation = 0
 		
-	# Update positions of remaining parts
-	for i in range(parts.size()):
-		if (i == 0 and front_part_eaten) or (i == 1 and back_part_eaten):
-			continue
-			
-		var part_pos = part_positions[i]
-		var world_part_pos = get_world_part_position(grid_pos, part_pos)
-		var pixel_pos = grid.grid_to_world(world_part_pos)
-		parts[i].position = pixel_pos - position  # Convert to local position
+		# Apply horizontal flipping if facing right
+		for part in parts:
+			part.flip_h = (facing_direction.x > 0)
+			part.flip_v = false
+	else:  # Vertical orientation
+		if parts.size() > 0:
+			parts[0].position = Vector2(0, 0)
+			parts[0].rotation = deg_to_rad(90) if facing_direction.y > 0 else deg_to_rad(-90)
+		if parts.size() > 1:
+			parts[1].position = Vector2(0, grid.CELL_SIZE) if facing_direction.y > 0 else Vector2(0, -grid.CELL_SIZE)
+			parts[1].rotation = deg_to_rad(90) if facing_direction.y > 0 else deg_to_rad(-90)
+		
+		# Reset flips for vertical orientation
+		for part in parts:
+			part.flip_h = false
+			part.flip_v = false
 
 # Pig linear movement
 func move_linear(curr_pos):
@@ -176,55 +188,53 @@ func choose_new_direction():
 
 # Override to handle multi-cell rotation
 func update_multi_cell_rotation():
-	# Flip or rotate parts based on facing direction
-	for part in parts:
-		part.rotation = 0
-		part.flip_h = false
-		part.flip_v = false
-	
-	if facing_direction.x > 0:  # Right
-		# Flip horizontally
-		for part in parts:
-			part.flip_h = true
-	elif facing_direction.x < 0:  # Left
-		# Default pig orientation is facing left - no change needed
-		pass
-	elif facing_direction.y > 0:  # Down
-		# Rotate 90 degrees clockwise
-		for part in parts:
-			part.rotation = deg_to_rad(90)
-	elif facing_direction.y < 0:  # Up
-		# Rotate 90 degrees counter-clockwise
-		for part in parts:
-			part.rotation = deg_to_rad(-90)
-	
-	# Update positions of parts
+	# Update the positions of parts
 	update_part_positions()
 
-# Handle part eaten
+# Get world part position override to handle vertical orientation
+func get_world_part_position(base_pos, relative_pos):
+	var world_pos = base_pos
+	
+	# For horizontal orientation
+	if facing_direction.x != 0:
+		world_pos += relative_pos
+	else:  # For vertical orientation
+		# When vertical, the pig is 1x2 instead of 2x1
+		if relative_pos.x == 1:  # Back part
+			world_pos += Vector2i(0, 1) if facing_direction.y > 0 else Vector2i(0, -1)
+	
+	return world_pos
+
+# Override handle_part_eaten to handle pig parts
 func handle_part_eaten(pos):
-	var relative_pos = pos - grid_pos
+	# Convert global position to local position relative to pig
+	var local_pos = pos - grid_pos
 	
-	# Check which part was eaten
-	for i in range(part_positions.size()):
-		var world_part_pos = get_world_part_position(grid_pos, part_positions[i])
-		if world_part_pos == pos:
-			if i == 0:  # Front part
-				front_part_eaten = true
+	# For horizontal orientation
+	if facing_direction.x != 0:
+		if local_pos == Vector2i(0, 0):
+			front_part_eaten = true
+			if parts.size() > 0:
 				parts[0].visible = false
-				has_missing_parts = true
-				# Behavior change: slow movement, no resource seeking
-			elif i == 1:  # Back part
-				back_part_eaten = true
+		elif local_pos == Vector2i(1, 0):
+			back_part_eaten = true
+			if parts.size() > 1:
 				parts[1].visible = false
-				has_missing_parts = true
-				# Behavior change: slow movement, continue resource seeking
+	else:  # For vertical orientation
+		if local_pos == Vector2i(0, 0):
+			front_part_eaten = true
+			if parts.size() > 0:
+				parts[0].visible = false
+		elif local_pos == Vector2i(0, 1) or local_pos == Vector2i(0, -1):
+			# The second part is either below or above depending on direction
+			back_part_eaten = true
+			if parts.size() > 1:
+				parts[1].visible = false
 	
-	# If both parts eaten, queue_free the whole animal
+	# Set flags for damage state
+	has_missing_parts = true
+	can_move = false  # Stop movement for the current turn
+	
+	# Check if all parts are eaten
 	if front_part_eaten and back_part_eaten:
 		queue_free()
-		return
-	
-	# Apply appropriate behavior changes
-	can_move = false  # Stop movement for the turn
-	move_cooldown = 0
