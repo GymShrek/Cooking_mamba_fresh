@@ -1,5 +1,137 @@
-[gd_scene format=3 uid="uid://dbvo5r2vlqixi"]
+[gd_scene load_steps=2 format=3 uid="uid://dbvo5r2vlqixi"]
+
+[sub_resource type="GDScript" id="GDScript_by74a"]
+script/source = "# scripts/debug/asset_checker.gd
+# Place this script in a new file under 'res://scripts/debug/'
+# Then attach it to any node in your scene to run it
+
+extends Node
+
+func _ready():
+	# Give the engine a moment to fully load
+	await get_tree().process_frame
+	await get_tree().process_frame
+	
+	print(\"\\n\\n======================= ASSET CHECKER =======================\")
+	print(\"Checking for asset files...\")
+	
+	# Check root directory structure
+	check_directory_structure()
+	
+	# Check animal textures 
+	check_textures_exist([
+		# Pig textures - various potential naming conventions
+		\"pig1-1.png\", \"pig1_1.png\", \"pig_front.png\", \"pig_1.png\",
+		\"pig2-1.png\", \"pig2_1.png\", \"pig_back.png\", \"pig_2.png\",
+		
+		# Cow textures
+		\"cow1-1.png\", \"cow1_1.png\", \"cow_front.png\", 
+		\"cow1-2.png\", \"cow1_2.png\", \"cow_front_top.png\",
+		\"cow2-1.png\", \"cow2_1.png\", \"cow_back.png\",
+		\"cow2-2.png\", \"cow2_2.png\", \"cow_back_top.png\",
+		
+		# Other animal textures
+		\"mouse.png\", \"chicken.png\", \"fish.png\",
+		
+		# Snake-carried resource textures
+		\"pig_snake.png\", \"pig1-1_snake.png\", \"pig2-1_snake.png\",
+		\"cow_snake.png\", \"cow1-1_snake.png\", \"cow1-2_snake.png\", 
+		\"cow2-1_snake.png\", \"cow2-2_snake.png\",
+		\"mouse_snake.png\", \"chicken_snake.png\", \"fish_snake.png\"
+	])
+	
+	# Check snake segment textures
+	check_textures_exist([
+		\"mamba_head.png\", \"mamba_mid.png\", \"mamba_mid_full.png\", 
+		\"mamba_mid_double.png\", \"mamba_mid_multi.png\", \"mamba_tail.png\"
+	])
+	
+	print(\"===================== CHECKER COMPLETE =====================\\n\")
+
+func check_directory_structure():
+	print(\"\\n--- Directory Structure ---\")
+	var dir = DirAccess.open(\"res://\")
+	if dir:
+		print(\"Root directories:\")
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != \"\":
+			if dir.current_is_dir() and not file_name.begins_with(\".\"):
+				print(\"- \" + file_name)
+			file_name = dir.get_next()
+	else:
+		print(\"ERROR: Could not access root directory\")
+	
+	# Check assets directory specifically
+	dir = DirAccess.open(\"res://assets\")
+	if dir:
+		print(\"\\nAssets directory contents:\")
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != \"\":
+			if not dir.current_is_dir():
+				print(\"- \" + file_name)
+			file_name = dir.get_next()
+	else:
+		print(\"ERROR: Could not access assets directory\")
+
+func check_textures_exist(texture_names):
+	print(\"\\n--- Texture Availability ---\")
+	var assets_dir = \"res://assets/\"
+	
+	# Group textures by category for better output readability
+	var categories = {}
+	
+	for texture in texture_names:
+		var category = \"other\"
+		if texture.begins_with(\"pig\"):
+			category = \"pig\"
+		elif texture.begins_with(\"cow\"):
+			category = \"cow\"
+		elif texture.begins_with(\"mamba\"):
+			category = \"snake\"
+		elif texture in [\"mouse.png\", \"chicken.png\", \"fish.png\"]:
+			category = \"animals\"
+		elif texture.ends_with(\"_snake.png\"):
+			category = \"snake_carried\"
+			
+		if not categories.has(category):
+			categories[category] = []
+		categories[category].append(texture)
+	
+	# Check each category
+	for category in categories:
+		print(\"\\n\" + category.capitalize() + \" textures:\")
+		for texture in categories[category]:
+			var file_exists = FileAccess.file_exists(assets_dir + texture)
+			var texture_loaded = false
+			if file_exists:
+				var tex = load(assets_dir + texture)
+				texture_loaded = tex != null
+			
+			print(\"- \" + texture + \": \" + (\"EXISTS\" if file_exists else \"MISSING\") + 
+				  (\", LOADS OK\" if texture_loaded else \"\"))
+			
+	print(\"\\n--- Texture Load Tests ---\")
+	print(\"Testing alternative paths for pig textures...\")
+	
+	# Try loading with different paths
+	var test_paths = [
+		\"res://assets/pig1-1.png\",
+		\"res://assets/pig_front.png\",
+		\"res://assets/pig1_1.png\"
+	]
+	
+	for path in test_paths:
+		var file_exists = FileAccess.file_exists(path)
+		var result = \"File \" + (\"EXISTS\" if file_exists else \"MISSING\")
+		if file_exists:
+			var tex = load(path)
+			result += \", Load \" + (\"SUCCESS\" if tex != null else \"FAILED\")
+		print(\"- \" + path + \": \" + result)
+"
 
 [node name="Animal" type="Node2D"]
+script = SubResource("GDScript_by74a")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]

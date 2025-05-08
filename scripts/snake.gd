@@ -7,9 +7,6 @@ enum Direction { UP, RIGHT, DOWN, LEFT }
 # References to scene nodes
 @onready var grid = get_parent().get_node("Grid")
 
-# Dictionary of resources that should be treated as double-width
-var double_width_resources = ["cow"]  # Add any future double-width resources here
-
 # Snake properties
 var game_speed = 0.2
 var current_direction = Direction.RIGHT
@@ -34,9 +31,15 @@ var tail_scene = preload("res://scenes/SnakeTail.tscn")
 var game_over = false
 var resources_collected = []
 
+# Reference to snake skin system
+var snake_skin
+
 signal resource_collected(resource_type)
 
 func _ready():
+	# Get the snake skin system
+	snake_skin = get_node_or_null("/root/SnakeSkin")
+	
 	# Initialize the snake with just head and tail
 	var head_pos = Vector2i(5, 7)
 	var tail_pos = Vector2i(4, 7)
@@ -87,7 +90,7 @@ func _process(delta):
 		turn_timer = 0
 		move_snake()
 
-# Input handling code remains the same
+# Input handling code
 func handle_input():
 	# Get input for direction change and add to buffer
 	var new_direction = -1
@@ -221,90 +224,30 @@ func update_segment_rotation(index):
 		elif direction == Vector2i(0, -1):  # Previous segment is above
 			segment.node.rotation = deg_to_rad(90)
 	
-	# Handle body segments rotation
-	else:
-		# Detect if this is part of a double-width segment pair
-		var is_double_front = "is_double_front" in segment and segment.is_double_front
-		var is_double_back = "is_double_back" in segment and segment.is_double_back
-		
-		# For double segments, we need special handling
-		if is_double_front or is_double_back:
-			handle_double_segment_rotation(index, is_double_front, is_double_back, dir_from_prev, dir_to_next)
-		else:
-			# Regular body segment - determine rotation based on neighboring segments
-			if dir_from_prev.x == -dir_to_next.x and dir_from_prev.y == 0 and dir_to_next.y == 0:
-				# Horizontal straight segment
-				segment.node.rotation = deg_to_rad(0)
-			elif dir_from_prev.y == -dir_to_next.y and dir_from_prev.x == 0 and dir_to_next.x == 0:
-				# Vertical straight segment
-				segment.node.rotation = deg_to_rad(90)
-			# Corner segments
-			elif (dir_from_prev.x == 0 and dir_to_next.y == 0) or (dir_from_prev.y == 0 and dir_to_next.x == 0):
-				# Determine the specific corner type and set rotation
-				if (dir_from_prev.y < 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y < 0):
-					# Top-right corner
-					segment.node.rotation = deg_to_rad(0)
-				elif (dir_from_prev.y < 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y < 0):
-					# Top-left corner
-					segment.node.rotation = deg_to_rad(270)
-				elif (dir_from_prev.y > 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y > 0):
-					# Bottom-right corner
-					segment.node.rotation = deg_to_rad(90)
-				elif (dir_from_prev.y > 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y > 0):
-					# Bottom-left corner
-					segment.node.rotation = deg_to_rad(180)
 
-# Special handling for double-width segments rotation
-func handle_double_segment_rotation(index, is_front, is_back, dir_from_prev, dir_to_next):
-	var segment = segments[index]
-	
-	if is_front:
-		# Front segment follows regular rotation rules based on direction
-		if dir_from_prev.x == 1:  # Coming from right
+	# Determine rotation based on neighboring segments
+		if dir_from_prev.x == -dir_to_next.x and dir_from_prev.y == 0 and dir_to_next.y == 0:
+			# Horizontal straight segment
 			segment.node.rotation = deg_to_rad(0)
-		elif dir_from_prev.x == -1:  # Coming from left
-			segment.node.rotation = deg_to_rad(180)
-		elif dir_from_prev.y == 1:  # Coming from below
+		elif dir_from_prev.y == -dir_to_next.y and dir_from_prev.x == 0 and dir_to_next.x == 0:
+			# Vertical straight segment
 			segment.node.rotation = deg_to_rad(90)
-		elif dir_from_prev.y == -1:  # Coming from above
-			segment.node.rotation = deg_to_rad(270)
-		
-		# Ensure the back segment is properly positioned
-		if index + 1 < segments.size() and "is_double_back" in segments[index + 1] and segments[index + 1].is_double_back:
-			position_double_back_segment(index)
-	
-	elif is_back:
-		# Back segment mirrors front segment rotation
-		if index > 0 and "is_double_front" in segments[index - 1] and segments[index - 1].is_double_front:
-			segment.node.rotation = segments[index - 1].node.rotation
+		# Corner segments
+		elif (dir_from_prev.x == 0 and dir_to_next.y == 0) or (dir_from_prev.y == 0 and dir_to_next.x == 0):
+			# Determine the specific corner type and set rotation
+			if (dir_from_prev.y < 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y < 0):
+				# Top-right corner
+				segment.node.rotation = deg_to_rad(0)
+			elif (dir_from_prev.y < 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y < 0):
+				# Top-left corner
+				segment.node.rotation = deg_to_rad(270)
+			elif (dir_from_prev.y > 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y > 0):
+				# Bottom-right corner
+				segment.node.rotation = deg_to_rad(90)
+			elif (dir_from_prev.y > 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y > 0):
+				# Bottom-left corner
+				segment.node.rotation = deg_to_rad(180)
 
-# Position the back segment of a double-width pair correctly
-func position_double_back_segment(front_index):
-	if front_index + 1 >= segments.size():
-		return
-		
-	var front_segment = segments[front_index]
-	var back_segment = segments[front_index + 1]
-	
-	# Calculate back position based on front rotation
-	var front_rotation = rad_to_deg(front_segment.node.rotation)
-	var front_pos = front_segment.grid_pos
-	var back_offset = Vector2i()
-	
-	# Determine back offset based on front rotation
-	match int(front_rotation) % 360:
-		0:   # Right
-			back_offset = Vector2i(-1, 0)  # Back is to the left
-		90:  # Down
-			back_offset = Vector2i(0, -1)  # Back is above
-		180: # Left
-			back_offset = Vector2i(1, 0)   # Back is to the right
-		270: # Up
-			back_offset = Vector2i(0, 1)   # Back is below
-	
-	# Update back segment grid position and node position
-	back_segment.grid_pos = front_pos + back_offset
-	back_segment.node.position = grid.grid_to_world(back_segment.grid_pos)
 
 func grow_snake_with_food(resource_type):
 	# Create a new body segment carrying food
@@ -328,53 +271,12 @@ func grow_snake_with_food(resource_type):
 	# Update the segment appearances
 	update_segments_appearance()
 
-# Enhanced function to add a double-width segment (which is actually two segments visually connected)
-func grow_snake_with_double_segment(resource_type):
-	# Create the first body segment (front part)
-	var front_segment = body_scene.instantiate()
-	front_segment.position = grid.grid_to_world(segments[1].grid_pos)
-	
-	# Set it as first half of the double segment
-	front_segment.set_carrying_food(true, resource_type + "_front")
-	front_segment.set_is_double_front(true)
-	
-	# Create the second body segment (back part)
-	var back_segment = body_scene.instantiate()
-	
-	# Position the back segment in the same place initially (will be repositioned later)
-	back_segment.position = grid.grid_to_world(segments[1].grid_pos)
-	
-	# Set it as second half of the double segment
-	back_segment.set_carrying_food(true, resource_type + "_back")
-	back_segment.set_is_double_back(true)
-	
-	# Add both segments to the scene
-	add_child(front_segment)
-	add_child(back_segment)
-	
-	# Insert both segments after the head
-	segments.insert(1, {
-		"node": front_segment,
-		"grid_pos": segments[1].grid_pos,
-		"carrying_food": true,
-		"resource_type": resource_type + "_front",
-		"is_double_front": true
-	})
-	
-	segments.insert(2, {
-		"node": back_segment,
-		"grid_pos": segments[1].grid_pos,  # Same as front initially, will be updated
-		"carrying_food": true,
-		"resource_type": resource_type + "_back",
-		"is_double_back": true
-	})
-	
-	# Update the segment appearances and positions
-	update_segments_appearance()
 
 func check_collectible_collision(pos: Vector2i):
 	# Check if any collectible is at the given position
 	var collectibles_node = get_parent().get_node("Collectibles")
+	
+	# Check standard collectibles
 	for collectible in collectibles_node.get_children():
 		# Skip chickens that are flying (uncollectible)
 		if collectible.resource_type == "chicken" and collectible.is_flying:
@@ -385,41 +287,121 @@ func check_collectible_collision(pos: Vector2i):
 		# For regular collectibles
 		if collectible_grid_pos == pos:
 			return collectible
-		
-		# Special case for cow (2x2 size) - make entire cow collectible
-		if collectible.resource_type == "cow":
-			# Check if snake head collides with any part of the cow
-			for x in range(2):
-				for y in range(2):
-					if collectible_grid_pos + Vector2i(x, y) == pos:
-						return collectible
 	
-	# Also check the AnimalController's animals list
+	# Check for animal controllers' multi-cell animals
 	var animal_controller = get_parent().get_node("AnimalController")
 	if animal_controller:
 		for animal in animal_controller.animals:
+			# Skip if animal is invalid
+			if not is_instance_valid(animal):
+				continue
+				
 			# Skip chickens that are flying
 			if animal.type == "chicken" and animal.is_flying:
 				continue
 				
+			# For multi-cell animals, check all parts
+			if animal.is_multi_cell:
+				# Check if each part position matches the collision position
+				for part_pos in animal.part_positions:
+					var world_part_pos = animal.get_world_part_position(animal.grid_pos, part_pos)
+					
+					if world_part_pos == pos:
+						# Skip parts that have already been eaten
+						var part_already_eaten = false
+						
+						# Check cow parts
+						if animal.type == "cow":
+							if (part_pos == Vector2i(0, 0) and animal.part_1_1_eaten) or \
+							   (part_pos == Vector2i(0, -1) and animal.part_1_2_eaten) or \
+							   (part_pos == Vector2i(1, 0) and animal.part_2_1_eaten) or \
+							   (part_pos == Vector2i(1, -1) and animal.part_2_2_eaten):
+								part_already_eaten = true
+						
+						# Check pig parts
+						elif animal.type == "pig":
+							if (part_pos == Vector2i(0, 0) and animal.front_part_eaten) or \
+							   (part_pos == Vector2i(1, 0) and animal.back_part_eaten):
+								part_already_eaten = true
+						
+						if not part_already_eaten:
+							# Create a custom result with the animal and position
+							return {
+								"animal": animal,
+								"part_pos": pos,
+								"is_multi_part": true
+							}
 			# For regular animals
-			if animal.grid_pos == pos:
+			elif animal.grid_pos == pos:
 				return animal
-			
-			# Special case for cow (2x2 size)
-			if animal.type == "cow":
-				for x in range(2):
-					for y in range(2):
-						if animal.grid_pos + Vector2i(x, y) == pos:
-							return animal
 	
 	return null
 
 func collect_resource(collectible):
 	var resource_type = ""
 	var is_animal = false
+	var is_multi_part = false
+	var part_type = ""  # Track which specific part was eaten
 	
-	# Check if this is an animal from the AnimalController
+	# Check if this is a multi-part animal part
+	if typeof(collectible) == TYPE_DICTIONARY and collectible.has("is_multi_part"):
+		is_multi_part = true
+		var animal = collectible.animal
+		var part_pos = collectible.part_pos
+		
+		# Make sure the animal is valid
+		if not is_instance_valid(animal):
+			return
+		
+		# Determine which specific part we're eating based on the animal type
+		if animal.type == "cow":
+			var local_pos = part_pos - animal.grid_pos
+			if local_pos == Vector2i(0, 0):  # Bottom-left
+				part_type = "cow1-1"
+			elif local_pos == Vector2i(0, -1):  # Top-left
+				part_type = "cow1-2"
+			elif local_pos == Vector2i(1, 0):  # Bottom-right
+				part_type = "cow2-1"
+			elif local_pos == Vector2i(1, -1):  # Top-right
+				part_type = "cow2-2"
+		elif animal.type == "pig":
+			var local_pos = part_pos - animal.grid_pos
+			if animal.facing_direction.x != 0:  # Horizontal orientation
+				if local_pos == Vector2i(0, 0):  # Front
+					part_type = "pig1-1"
+				elif local_pos == Vector2i(1, 0):  # Back
+					part_type = "pig2-1"
+			else:  # Vertical orientation
+				if local_pos == Vector2i(0, 0):  # Front
+					part_type = "pig1-1"
+				elif local_pos == Vector2i(0, 1) or local_pos == Vector2i(0, -1):  # Back
+					part_type = "pig2-1"
+		
+		# Handle multi-part animal collection
+		var animal_controller = get_parent().get_node("AnimalController")
+		if animal_controller and animal_controller.has_method("handle_animal_part_eaten"):
+			# Notify the animal controller that a part was eaten
+			animal_controller.handle_animal_part_eaten(animal, part_pos)
+		
+		# Add the specific part to collected resources
+		resource_type = part_type if part_type != "" else animal.type
+		is_animal = true
+		
+		# Create sparkle effect at the collision position
+		get_parent().create_sparkle_effect(grid.grid_to_world(part_pos))
+		
+		# Signal that a resource was collected
+		emit_signal("resource_collected", resource_type)
+		
+		# Add to resources collected list
+		resources_collected.append(resource_type)
+		
+		# Add the specific part to the snake
+		grow_snake_with_food(resource_type)
+		
+		return
+	
+	# Check if this is a regular animal from the AnimalController
 	if collectible is Animal:
 		resource_type = collectible.type
 		is_animal = true
@@ -440,15 +422,10 @@ func collect_resource(collectible):
 	emit_signal("resource_collected", resource_type)
 	
 	# Create sparkle effect at the collectible's position
-	get_parent().create_sparkle_effect(collectible.position if collectible is Animal else collectible.position)
+	get_parent().create_sparkle_effect(collectible.position)
 	
-	# Handle different resource types
-	if resource_type in double_width_resources:
-		# Special case for double-width resources
-		grow_snake_with_double_segment(resource_type)
-	else:
-		# Regular resources add a regular body segment
-		grow_snake_with_food(resource_type)
+	# Grow the snake with a new segment
+	grow_snake_with_food(resource_type)
 	
 	# Remove the collectible - Animals are removed by AnimalController.remove_animal
 	if not (collectible is Animal):
@@ -492,3 +469,4 @@ func create_sparkle_effect(position):
 	
 	# Connect the timer to a function that removes the particles
 	timer.timeout.connect(func(): particles.queue_free(); timer.queue_free())
+	

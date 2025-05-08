@@ -24,7 +24,7 @@ func _ready():
 func setup_sprite():
 	normal_texture = load("res://assets/chicken.png")
 	mid_texture = load("res://assets/chicken_mid.png")
-	flying_texture = load("res://assets/chicken_flying.png")
+	flying_texture = load("res://assets/chicken_flight.png")
 	$Sprite2D.texture = normal_texture
 
 func move():
