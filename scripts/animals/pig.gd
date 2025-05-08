@@ -219,28 +219,31 @@ func move():
 		grid_pos = new_pos
 		position = grid.grid_to_world(grid_pos)
 
-# Get world part position override to handle vertical orientation
+# Get world part position override to handle all orientations properly
 func get_world_part_position(base_pos, relative_pos):
-	var world_pos = base_pos
+	# For pig's collision, we need to handle the flipped positions when facing right
+	# and the rotated positions when facing up/down
 	
-	# For horizontal orientation
-	if facing_direction.x != 0:
-		if facing_direction.x > 0:  # Facing right (swapped positions)
-			if relative_pos == Vector2i(0, 0):  # Front part
-				world_pos += Vector2i(0, 0)
-			elif relative_pos == Vector2i(1, 0):  # Back part
-				world_pos += Vector2i(-1, 0)  # Back is now on the left
-		else:  # Facing left (normal positions)
-			world_pos += relative_pos
-	else:  # For vertical orientation
+	if facing_direction.x > 0:  # Facing right - we've swapped positions
+		if relative_pos == Vector2i(0, 0):  # Front becomes back (positions are swapped)
+			return base_pos + Vector2i(1, 0)
+		elif relative_pos == Vector2i(1, 0):  # Back becomes front
+			return base_pos + Vector2i(0, 0)
+	elif facing_direction.y != 0:  # Vertical orientation
 		if facing_direction.y > 0:  # Facing down
-			if relative_pos == Vector2i(1, 0):  # Back part
-				world_pos += Vector2i(0, 1)
+			if relative_pos == Vector2i(0, 0):  # Front
+				return base_pos + Vector2i(0, 0)
+			elif relative_pos == Vector2i(1, 0):  # Back
+				return base_pos + Vector2i(0, 1)
 		else:  # Facing up
-			if relative_pos == Vector2i(1, 0):  # Back part
-				world_pos += Vector2i(0, -1)
+			if relative_pos == Vector2i(0, 0):  # Front
+				return base_pos + Vector2i(0, 0)
+			elif relative_pos == Vector2i(1, 0):  # Back
+				return base_pos + Vector2i(0, -1)
 	
-	return world_pos
+	# Default behavior for facing left (normal positions)
+	return base_pos + relative_pos
+
 
 # Pig linear movement
 func move_linear(curr_pos):
@@ -296,51 +299,48 @@ func choose_new_direction():
 	# If no valid direction, set to zero
 	current_dir = Vector2i()
 
-# Override handle_part_eaten to handle pig parts
+# Override handle_part_eaten to handle pig parts with all orientations
 func handle_part_eaten(pos):
 	# Convert global position to local position relative to pig
 	var local_pos = pos - grid_pos
 	
-	# Determine which part was eaten based on world position and orientation
-	# This logic matches the get_world_part_position calculations
-	if facing_direction.x != 0:  # Horizontal
-		if facing_direction.x > 0:  # Facing right (positions swapped)
-			if local_pos == Vector2i(0, 0):  # Front is on the left
-				front_part_eaten = true
-				if parts.size() > 0:
-					parts[0].visible = false
-			elif local_pos == Vector2i(-1, 0):  # Back is on the right
-				back_part_eaten = true
-				if parts.size() > 1:
-					parts[1].visible = false
-		else:  # Facing left (normal positions)
-			if local_pos == Vector2i(0, 0):  # Front is on the left
-				front_part_eaten = true
-				if parts.size() > 0:
-					parts[0].visible = false
-			elif local_pos == Vector2i(1, 0):  # Back is on the right
-				back_part_eaten = true
-				if parts.size() > 1:
-					parts[1].visible = false
-	else:  # Vertical
-		if facing_direction.y > 0:  # Facing down
-			if local_pos == Vector2i(0, 0):  # Front is on top
-				front_part_eaten = true
-				if parts.size() > 0:
-					parts[0].visible = false
-			elif local_pos == Vector2i(0, 1):  # Back is on bottom
-				back_part_eaten = true  
-				if parts.size() > 1:
-					parts[1].visible = false
-		else:  # Facing up
-			if local_pos == Vector2i(0, 0):  # Front is on bottom
-				front_part_eaten = true
-				if parts.size() > 0:
-					parts[0].visible = false
-			elif local_pos == Vector2i(0, -1):  # Back is on top
-				back_part_eaten = true
-				if parts.size() > 1:
-					parts[1].visible = false
+	# Determine which part was eaten based on facing direction
+	if facing_direction.x > 0:  # Facing right - positions are swapped
+		if local_pos == Vector2i(1, 0):  # Front position (visually back)
+			front_part_eaten = true
+			if parts.size() > 0:
+				parts[0].visible = false
+		elif local_pos == Vector2i(0, 0):  # Back position (visually front)
+			back_part_eaten = true
+			if parts.size() > 1:
+				parts[1].visible = false
+	elif facing_direction.x < 0:  # Facing left - normal positions
+		if local_pos == Vector2i(0, 0):  # Front
+			front_part_eaten = true
+			if parts.size() > 0:
+				parts[0].visible = false
+		elif local_pos == Vector2i(1, 0):  # Back
+			back_part_eaten = true
+			if parts.size() > 1:
+				parts[1].visible = false
+	elif facing_direction.y > 0:  # Facing down
+		if local_pos == Vector2i(0, 0):  # Front
+			front_part_eaten = true
+			if parts.size() > 0:
+				parts[0].visible = false
+		elif local_pos == Vector2i(0, 1):  # Back
+			back_part_eaten = true
+			if parts.size() > 1:
+				parts[1].visible = false
+	elif facing_direction.y < 0:  # Facing up
+		if local_pos == Vector2i(0, 0):  # Front
+			front_part_eaten = true
+			if parts.size() > 0:
+				parts[0].visible = false
+		elif local_pos == Vector2i(0, -1):  # Back
+			back_part_eaten = true
+			if parts.size() > 1:
+				parts[1].visible = false
 	
 	# Set flags for damage state
 	has_missing_parts = true
