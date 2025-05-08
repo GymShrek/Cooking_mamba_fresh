@@ -1,4 +1,5 @@
 # scripts/animal_controller.gd
+# This is a simplified version to ensure animals display correctly
 extends Node2D
 
 # References to game nodes
@@ -12,7 +13,7 @@ var turn_delay = 0.2  # Match with snake's game_speed
 # Keep track of all animals
 var animals = []
 
-# Animal scenes - ALL animals are handled through these scenes
+# Animal scenes
 var mouse_scene = preload("res://scenes/animals/Mouse.tscn")
 var chicken_scene = preload("res://scenes/animals/Chicken.tscn")
 var pig_scene = preload("res://scenes/animals/Pig.tscn")
@@ -21,7 +22,6 @@ var fish_scene = preload("res://scenes/animals/Fish.tscn")
 
 func _ready():
 	# Initialize after a short delay to ensure other nodes are ready
-	# We'll use await instead of call_deferred for more reliable initialization
 	await get_tree().process_frame
 	await get_tree().process_frame
 	initialize()
@@ -32,7 +32,6 @@ func initialize():
 		push_error("Grid reference is null in AnimalController")
 		grid = get_parent().get_node_or_null("Grid")
 		if grid == null:
-			# Wait one more frame and try again
 			await get_tree().process_frame
 			initialize()
 			return
@@ -41,19 +40,11 @@ func initialize():
 		push_error("Snake reference is null in AnimalController")
 		snake = get_parent().get_node_or_null("Snake")
 		if snake == null:
-			# Wait one more frame and try again
 			await get_tree().process_frame
 			initialize()
 			return
 	
-	# Check if snake has segments before proceeding
-	if snake.segments == null or snake.segments.size() == 0:
-		# Wait one more frame and try again
-		await get_tree().process_frame
-		initialize()
-		return
-	
-	# Now that everything is properly initialized, spawn animals
+	# Now that everything is initialized, spawn animals
 	await spawn_initial_animals()
 
 func _process(delta):
@@ -66,11 +57,10 @@ func _process(delta):
 # Spawn initial animals for the level
 func spawn_initial_animals():
 	print("Spawning initial animals")
-	await spawn_animals("mouse", 3)
-	await spawn_animals("chicken", 2)
+	await spawn_animals("mouse", 2)
+	await spawn_animals("chicken", 1)
 	await spawn_animals("pig", 1)
 	await spawn_animals("cow", 1)
-	# Fish will be spawned in water areas when they're implemented
 
 # Spawn a specific number of a given animal type
 func spawn_animals(type, count):
@@ -91,7 +81,7 @@ func spawn_animals(type, count):
 				push_error("Unknown animal type: " + type)
 				return
 		
-		# Find a valid position based on animal type - use await here
+		# Find a valid position
 		var grid_pos = await find_valid_spawn_position(type)
 		
 		if grid_pos == Vector2i(-1, -1):
@@ -102,109 +92,50 @@ func spawn_animals(type, count):
 		
 		# Set position based on grid
 		animal.grid_pos = grid_pos
-		
-		# For multi-cell animals, the position is handled by their internal code
-		# For single-cell animals, use the grid_pos directly
 		animal.position = grid.grid_to_world(grid_pos)
 		
-		# Ensure the animal gets properly initialized
+		# Ensure proper name
 		animal.name = type.capitalize() + str(i)
 		
 		# Add to scene and track
 		add_child(animal)
 		animals.append(animal)
 		
-		# For multi-cell animals, ensure their parts are properly positioned
-		if animal.is_multi_cell:
-			# Wait a frame to make sure the animal is fully initialized
-			await get_tree().process_frame
-			if animal.has_method("update_part_positions"):
-				animal.update_part_positions()
+		# Wait a frame to ensure animal is fully initialized
+		await get_tree().process_frame
 
 # Find a valid position for spawning an animal
-# This is now a coroutine function that uses await
 func find_valid_spawn_position(type):
-	var attempts = 30  # Increase the number of attempts
+	var attempts = 30
 	var grid_pos = Vector2i()
 	
 	for attempt in range(attempts):
-		match type:
-			"mouse":
-				# Mice spawn near the perimeter
-				var perimeter_choice = randi() % 4
-				if perimeter_choice == 0:  # Top row
-					grid_pos = Vector2i(randi_range(1, grid.grid_size.x - 2), 1)
-				elif perimeter_choice == 1:  # Right column
-					grid_pos = Vector2i(grid.grid_size.x - 2, randi_range(1, grid.grid_size.y - 2))
-				elif perimeter_choice == 2:  # Bottom row
-					grid_pos = Vector2i(randi_range(1, grid.grid_size.x - 2), grid.grid_size.y - 2)
-				else:  # Left column
-					grid_pos = Vector2i(1, randi_range(1, grid.grid_size.y - 2))
-			
-			"cow":
-				# Cow needs a 2x2 area
-				grid_pos = Vector2i(
-					randi_range(1, grid.grid_size.x - 3),  # -3 to account for 2x2 size
-					randi_range(1, grid.grid_size.y - 3)
-				)
-			
-			"pig":
-				# Pig needs a 2x1 area
-				grid_pos = Vector2i(
-					randi_range(1, grid.grid_size.x - 3),  # -3 to account for 2x1 size
-					randi_range(1, grid.grid_size.y - 2)
-				)
-			
-			"fish":
-				# Fish will spawn in water areas when implemented
-				# For now, use a random position
-				grid_pos = Vector2i(
-					randi_range(1, grid.grid_size.x - 2),
-					randi_range(1, grid.grid_size.y - 2)
-				)
-			
-			_:
-				# Other animals spawn anywhere valid
-				grid_pos = Vector2i(
-					randi_range(1, grid.grid_size.x - 2),
-					randi_range(1, grid.grid_size.y - 2)
-				)
+		# Generate a random position away from walls
+		grid_pos = Vector2i(
+			randi_range(2, grid.grid_size.x - 3),
+			randi_range(2, grid.grid_size.y - 3)
+		)
 		
-		# Create a temporary animal to check position validity
-		var temp_animal
-		match type:
-			"cow":
-				temp_animal = cow_scene.instantiate()
-			"pig":
-				temp_animal = pig_scene.instantiate()
-			"mouse":
-				temp_animal = mouse_scene.instantiate()
-			"chicken":
-				temp_animal = chicken_scene.instantiate()
-			"fish":
-				temp_animal = fish_scene.instantiate()
-		
-		# Set the grid position
-		temp_animal.grid_pos = grid_pos
-		
-		# We need to add it to the scene to properly initialize it
-		add_child(temp_animal)
-		
-		# Wait a frame to ensure it's initialized
-		await get_tree().process_frame
-		
-		# Check if position is valid using the animal's own validation method
-		var is_valid = false
-		if temp_animal.is_multi_cell:
-			is_valid = temp_animal.is_multi_cell_position_valid(grid_pos)
-		else:
-			is_valid = temp_animal.is_position_valid(grid_pos)
-		
-		# Clean up the temporary animal
-		temp_animal.queue_free()
-		
-		if is_valid:
-			return grid_pos
+		# Check if position is valid using grid
+		if grid.is_cell_vacant(grid_pos):
+			# For multi-cell animals, check additional spaces
+			if type == "cow":
+				# Check 2x2 area
+				var valid = true
+				for x in range(2):
+					for y in range(2):
+						if not grid.is_cell_vacant(Vector2i(grid_pos.x + x, grid_pos.y + y)):
+							valid = false
+							break
+				if valid:
+					return grid_pos
+			elif type == "pig":
+				# Check 2x1 area
+				if grid.is_cell_vacant(Vector2i(grid_pos.x + 1, grid_pos.y)):
+					return grid_pos
+			else:
+				# Single-cell animal
+				return grid_pos
 	
 	return Vector2i(-1, -1)  # No valid position found
 
@@ -235,27 +166,22 @@ func handle_animal_part_eaten(animal, pos):
 		return
 	
 	# Call the animal's specific handler for part eating
-	if animal.is_multi_cell:
-		animal.handle_part_eaten(pos)
-		
-		# Check if the animal still has any parts left
-		var all_parts_eaten = false
-		
-		if animal.type == "cow":
-			all_parts_eaten = animal.part_1_1_eaten and animal.part_1_2_eaten and animal.part_2_1_eaten and animal.part_2_2_eaten
-		elif animal.type == "pig":
-			all_parts_eaten = animal.front_part_eaten and animal.back_part_eaten
-			
-		# If all parts eaten, remove the animal
-		if all_parts_eaten:
-			remove_animal(animal)
-	else:
+	animal.handle_part_eaten(pos)
+	
+	# Check if the animal should be removed completely - using property checks with 'in' operator
+	if (animal.type == "cow" and "part_1_1_eaten" in animal and 
+		animal.part_1_1_eaten and animal.part_1_2_eaten and 
+		animal.part_2_1_eaten and animal.part_2_2_eaten):
+		remove_animal(animal)
+	elif (animal.type == "pig" and "front_part_eaten" in animal and 
+		animal.front_part_eaten and animal.back_part_eaten):
+		remove_animal(animal)
+	elif (not "is_multi_cell" in animal or not animal.is_multi_cell):
 		# For single-cell animals, just remove them
 		remove_animal(animal)
 
 # Remove an animal (when collected by snake)
 func remove_animal(animal):
-	# Make sure the animal is valid
 	if not is_instance_valid(animal):
 		push_error("Invalid animal in remove_animal")
 		var index = animals.find(animal)
@@ -268,3 +194,7 @@ func remove_animal(animal):
 		animals.remove_at(index)
 	
 	animal.queue_free()
+
+# Helper extension
+func has_variable(object, variable_name):
+	return variable_name in object

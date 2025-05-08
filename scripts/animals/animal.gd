@@ -114,7 +114,7 @@ func initialize_multi_cell():
 func initialize_multi_cell_sprites(textures, positions):
 	# Clear existing parts
 	for child in get_children():
-		if child.name != "Sprite2D":  # Keep the main sprite
+		if child.name.begins_with("Part"):
 			child.queue_free()
 	
 	parts.clear()
@@ -129,7 +129,7 @@ func initialize_multi_cell_sprites(textures, positions):
 		# Check if the texture is valid
 		if textures[i] == null:
 			push_error(name + ": Texture " + str(i) + " is null!")
-			part.texture = preload("res://icon.svg")  # Use fallback texture
+			part.texture = load("res://icon.svg")  # Use fallback texture
 		else:
 			part.texture = textures[i]
 			
@@ -150,26 +150,6 @@ func initialize_multi_cell_sprites(textures, positions):
 		parts.append(part)
 		
 		print(name + ": Added part " + part.name + " at position " + str(part.position))
-	
-	# Update initial appearance
-	update_multi_cell_rotation()
-	
-	# Create part sprites based on provided textures and positions
-	for i in range(textures.size()):
-		var part = Sprite2D.new()
-		part.texture = textures[i]
-		part.name = "Part" + str(i)
-		
-		# Set initial position based on the grid layout
-		if grid != null:
-			var offset = positions[i] * grid.CELL_SIZE
-			part.position = offset
-		else:
-			push_error("Grid reference is null during multi-cell sprite initialization")
-			part.position = Vector2(i * 32, 0)  # Fallback for testing
-		
-		add_child(part)
-		parts.append(part)
 	
 	# Update initial appearance
 	update_multi_cell_rotation()
