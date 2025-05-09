@@ -167,26 +167,20 @@ func update_facing_direction(new_pos):
 			update_multi_cell_rotation()
 
 func update_sprite_direction():
-	# Simple single cell animal rotation
+	# Simple single cell animal rotation - NO ROTATION, only horizontal flip
 	# First check if Sprite2D exists
 	if not has_node("Sprite2D"):
 		return
 		
 	# Reset rotation and flip
-	$Sprite2D.rotation = 0
+	$Sprite2D.rotation = 0  # Always keep rotation at 0
 	$Sprite2D.flip_h = false
 	$Sprite2D.flip_v = false
 	
-	# Apply appropriate transform based on facing direction
+	# Only apply horizontal flipping based on facing direction
 	if facing_direction.x > 0:  # Right
 		$Sprite2D.flip_h = true
-	elif facing_direction.x < 0:  # Left
-		# Default sprite orientation is typically facing left
-		pass
-	elif facing_direction.y > 0:  # Down
-		$Sprite2D.rotation = deg_to_rad(90)
-	elif facing_direction.y < 0:  # Up
-		$Sprite2D.rotation = deg_to_rad(-90)
+	# We always keep the default sprite orientation for all other directions
 
 func update_multi_cell_rotation():
 	# Override in child classes to handle multi-cell rotations

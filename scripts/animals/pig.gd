@@ -113,7 +113,8 @@ func initialize_multi_cell():
 		print("PIG: Parts already created, count:", parts.size())
 		update_part_positions()
 
-# Update visual positions of all parts based on grid_pos and facing direction
+# In scripts/animals/pig.gd, replace update_part_positions() with:
+
 func update_part_positions():
 	print("PIG: update_part_positions called, parts count:", parts.size())
 	
@@ -133,45 +134,27 @@ func update_part_positions():
 		back_part.visible = true
 	
 	# Reset rotations and flips
-	front_part.rotation = 0
-	back_part.rotation = 0
+	front_part.rotation = 0  # Always keep rotation at 0
+	back_part.rotation = 0   # Always keep rotation at 0
 	front_part.flip_h = false
 	back_part.flip_h = false
 	
 	# Apply transformations based on direction
-	if facing_direction.x != 0:  # Horizontal orientation
-		if facing_direction.x > 0:  # Facing right
-			# Flip sprites horizontally
-			front_part.flip_h = true
-			back_part.flip_h = true
-			
-			# Swap positions
-			front_part.position = Vector2(0, 0)
-			back_part.position = Vector2(-grid.CELL_SIZE, 0)
-		else:  # Facing left
-			# Normal orientation
-			front_part.position = Vector2(0, 0)
-			back_part.position = Vector2(grid.CELL_SIZE, 0)
-	else:  # Vertical orientation
-		if facing_direction.y > 0:  # Facing down
-			# Rotate both parts
-			front_part.rotation = deg_to_rad(-90)
-			back_part.rotation = deg_to_rad(-90)
-			
-			# Stack vertically
-			front_part.position = Vector2(0, grid.CELL_SIZE)
-			back_part.position = Vector2(0, 0)
-		else:  # Facing up
-			# Rotate both parts
-			front_part.rotation = deg_to_rad(90)
-			back_part.rotation = deg_to_rad(90)
-			
-			# Stack vertically
-			front_part.position = Vector2(0, -grid.CELL_SIZE)
-			back_part.position = Vector2(0, 0)
-	
-	print("PIG: Parts positioned - Front:", front_part.position, "visible:", front_part.visible)
-	print("PIG: Parts positioned - Back:", back_part.position, "visible:", back_part.visible)
+	if facing_direction.x > 0:  # Facing right
+		# Flip sprites horizontally
+		front_part.flip_h = true
+		back_part.flip_h = true
+		
+		# Swap positions (horizontal only)
+		front_part.position = Vector2(grid.CELL_SIZE, 0)
+		back_part.position = Vector2(0, 0)
+	else:  # All other directions (including left)
+		# Normal horizontal orientation
+		front_part.position = Vector2(0, 0)
+		back_part.position = Vector2(grid.CELL_SIZE, 0)
+
+	# NO VERTICAL ORIENTATION - always stay horizontal
+
 
 # This method just passes through to update_part_positions
 func update_multi_cell_rotation():
@@ -220,30 +203,17 @@ func move():
 		position = grid.grid_to_world(grid_pos)
 
 # Get world part position override to handle all orientations properly
+# Modify pig.gd get_world_part_position to handle horizontal-only layout
 func get_world_part_position(base_pos, relative_pos):
-	# For pig's collision, we need to handle the flipped positions when facing right
-	# and the rotated positions when facing up/down
-	
-	if facing_direction.x > 0:  # Facing right - we've swapped positions
-		if relative_pos == Vector2i(0, 0):  # Front becomes back (positions are swapped)
+	# For pig's collision, we only need to handle the swapped positions when facing right
+	if facing_direction.x > 0:  # Facing right - positions are swapped
+		if relative_pos == Vector2i(0, 0):  # Front becomes back
 			return base_pos + Vector2i(1, 0)
 		elif relative_pos == Vector2i(1, 0):  # Back becomes front
 			return base_pos + Vector2i(0, 0)
-	elif facing_direction.y != 0:  # Vertical orientation
-		if facing_direction.y > 0:  # Facing down
-			if relative_pos == Vector2i(0, 0):  # Front
-				return base_pos + Vector2i(0, 0)
-			elif relative_pos == Vector2i(1, 0):  # Back
-				return base_pos + Vector2i(0, 1)
-		else:  # Facing up
-			if relative_pos == Vector2i(0, 0):  # Front
-				return base_pos + Vector2i(0, 0)
-			elif relative_pos == Vector2i(1, 0):  # Back
-				return base_pos + Vector2i(0, -1)
 	
-	# Default behavior for facing left (normal positions)
+	# Default behavior for all other directions (normal positions)
 	return base_pos + relative_pos
-
 
 # Pig linear movement
 func move_linear(curr_pos):

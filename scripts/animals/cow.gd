@@ -126,7 +126,8 @@ func initialize_multi_cell():
 		print("COW: Parts already created, count:", parts.size())
 		force_orientation()
 
-# Force orientation based on facing_direction
+# In scripts/animals/cow.gd, modify force_orientation() to:
+
 func force_orientation():
 	print("COW: Forcing orientation with facing direction:", facing_direction)
 	
@@ -143,12 +144,12 @@ func force_orientation():
 	
 	# Reset all transformations
 	for part in parts:
-		part.rotation = 0
+		part.rotation = 0  # Always keep rotation at 0
 		part.scale = Vector2(1, 1)
 		part.flip_h = false
 		part.flip_v = false
 	
-	# SWAP positions when facing right, similar to the pig
+	# Only handle horizontal flipping for right-facing
 	if facing_direction.x > 0:  # Facing right
 		# Flip all parts horizontally
 		for part in parts:
@@ -159,7 +160,7 @@ func force_orientation():
 		parts[1].position = Vector2(grid.CELL_SIZE, -grid.CELL_SIZE)  # Top-left becomes top-right
 		parts[2].position = Vector2(0, 0)                    # Bottom-right becomes bottom-left
 		parts[3].position = Vector2(0, -grid.CELL_SIZE)      # Top-right becomes top-left
-	else:  # Facing left (or any other direction)
+	else:  # All other directions (including left)
 		# Position the parts in normal layout
 		parts[0].position = Vector2(0, 0)                    # Bottom-left
 		parts[1].position = Vector2(0, -grid.CELL_SIZE)      # Top-left
@@ -167,8 +168,7 @@ func force_orientation():
 		parts[3].position = Vector2(grid.CELL_SIZE, -grid.CELL_SIZE)  # Top-right
 	
 	print("COW: Parts positioned based on facing direction:", facing_direction)
-	print("COW: Part 0 position:", parts[0].position, "flip_h:", parts[0].flip_h)
-	print("COW: Part 2 position:", parts[2].position, "flip_h:", parts[2].flip_h)
+
 
 # Override update_facing_direction to track changes
 func update_facing_direction(new_pos):
@@ -190,9 +190,10 @@ func update_multi_cell_rotation():
 	force_orientation()
 
 # This method ONLY affects what grid cells the cow occupies
+# Modify cow.gd get_world_part_position for horizontal-only layout
 func get_world_part_position(base_pos, relative_pos):
 	# For cow's collision, we need to handle the flipped positions when facing right
-	if facing_direction.x > 0:  # Facing right - we've swapped positions
+	if facing_direction.x > 0:  # Facing right - positions are swapped
 		if relative_pos == Vector2i(0, 0):  # Bottom-left becomes bottom-right
 			return base_pos + Vector2i(1, 0)
 		elif relative_pos == Vector2i(0, -1):  # Top-left becomes top-right
@@ -202,8 +203,9 @@ func get_world_part_position(base_pos, relative_pos):
 		elif relative_pos == Vector2i(1, -1):  # Top-right becomes top-left
 			return base_pos + Vector2i(0, -1)
 	
-	# Default behavior for facing left (normal positions)
+	# Default behavior for all other directions (normal positions)
 	return base_pos + relative_pos
+
 
 # Modified movement function to call force_orientation() after position changes
 func move():

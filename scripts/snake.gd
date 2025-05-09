@@ -208,6 +208,9 @@ func update_segment_rotation(index):
 				segment.node.rotation = deg_to_rad(90)
 			Direction.LEFT:
 				segment.node.rotation = deg_to_rad(180)
+				segment.flip_v = true
+
+				
 	
 	# Handle tail rotation
 	elif index == segments.size() - 1:
@@ -225,28 +228,7 @@ func update_segment_rotation(index):
 			segment.node.rotation = deg_to_rad(90)
 	
 
-	# Determine rotation based on neighboring segments
-		if dir_from_prev.x == -dir_to_next.x and dir_from_prev.y == 0 and dir_to_next.y == 0:
-			# Horizontal straight segment
-			segment.node.rotation = deg_to_rad(0)
-		elif dir_from_prev.y == -dir_to_next.y and dir_from_prev.x == 0 and dir_to_next.x == 0:
-			# Vertical straight segment
-			segment.node.rotation = deg_to_rad(90)
-		# Corner segments
-		elif (dir_from_prev.x == 0 and dir_to_next.y == 0) or (dir_from_prev.y == 0 and dir_to_next.x == 0):
-			# Determine the specific corner type and set rotation
-			if (dir_from_prev.y < 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y < 0):
-				# Top-right corner
-				segment.node.rotation = deg_to_rad(0)
-			elif (dir_from_prev.y < 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y < 0):
-				# Top-left corner
-				segment.node.rotation = deg_to_rad(270)
-			elif (dir_from_prev.y > 0 and dir_to_next.x > 0) or (dir_from_prev.x > 0 and dir_to_next.y > 0):
-				# Bottom-right corner
-				segment.node.rotation = deg_to_rad(90)
-			elif (dir_from_prev.y > 0 and dir_to_next.x < 0) or (dir_from_prev.x < 0 and dir_to_next.y > 0):
-				# Bottom-left corner
-				segment.node.rotation = deg_to_rad(180)
+
 
 
 func grow_snake_with_food(resource_type):
