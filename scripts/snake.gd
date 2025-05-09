@@ -204,12 +204,12 @@ func update_segment_rotation(index):
 				segment.node.rotation = deg_to_rad(270)
 			Direction.RIGHT:
 				segment.node.rotation = deg_to_rad(0)
+				segment.node.get_node("Sprite2D").flip_v = false
 			Direction.DOWN:
 				segment.node.rotation = deg_to_rad(90)
 			Direction.LEFT:
 				segment.node.rotation = deg_to_rad(180)
-				segment.flip_v = true
-
+				segment.node.get_node("Sprite2D").flip_v = true
 				
 	
 	# Handle tail rotation

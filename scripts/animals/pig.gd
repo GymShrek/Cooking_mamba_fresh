@@ -8,8 +8,9 @@ var current_dir = Vector2i(1, 0)
 # Part-specific damage flags
 var front_part_eaten = false
 var back_part_eaten = false
+var move_counter = 0
 
-# Textures for different parts - declare these at the class level
+# Textures for different parts
 var front_texture = null
 var back_texture = null
 
@@ -75,7 +76,7 @@ func force_create_sprites():
 	# Remove any existing sprites first
 	var to_remove = []
 	for child in get_children():
-		if child.name == "Part0" or child.name == "Part1" or child is Sprite2D:
+		if child.name.begins_with("Part") or (child is Sprite2D and child.name != "Sprite2D"):
 			to_remove.append(child)
 	
 	for child in to_remove:
@@ -113,8 +114,6 @@ func initialize_multi_cell():
 		print("PIG: Parts already created, count:", parts.size())
 		update_part_positions()
 
-# In scripts/animals/pig.gd, replace update_part_positions() with:
-
 func update_part_positions():
 	print("PIG: update_part_positions called, parts count:", parts.size())
 	
@@ -127,11 +126,9 @@ func update_part_positions():
 	var front_part = parts[0]
 	var back_part = parts[1]
 	
-	# Ensure visibility
-	if not front_part_eaten:
-		front_part.visible = true
-	if not back_part_eaten:
-		back_part.visible = true
+	# Ensure visibility based on eaten state
+	front_part.visible = !front_part_eaten
+	back_part.visible = !back_part_eaten
 	
 	# Reset rotations and flips
 	front_part.rotation = 0  # Always keep rotation at 0
@@ -155,32 +152,33 @@ func update_part_positions():
 
 	# NO VERTICAL ORIENTATION - always stay horizontal
 
-
 # This method just passes through to update_part_positions
 func update_multi_cell_rotation():
 	update_part_positions()
 
 func move():
-	# Don't move if we've been eaten
+	# Skip if we can't move for this turn
 	if not can_move:
 		return
 		
-	# Apply movement slowdown if damaged
-	if has_missing_parts:
-		move_cooldown += 1
-		if move_cooldown < 2:  # Move every other turn when damaged
-			return
-		move_cooldown = 0
-	
 	# Safety checks
 	if grid == null or main == null or snake == null:
 		return
-		
-	var snake_head_pos = snake.segments[0].grid_pos
+	
+	# Apply movement slowdown for damaged pig - using has_missing_parts from base class
+	if has_missing_parts and move_counter % 2 != 0:
+		# Move every other turn when damaged
+		move_counter += 1
+		return
+	
+	move_counter += 1
+	
+	var snake_head_pos = snake.segments[0].grid_pos if snake else Vector2i(-1, -1)
 	var new_pos = grid_pos
 	
-	# Check for resources to destroy (only if both parts are intact)
+	# Choose movement behavior based on damage state
 	if not front_part_eaten and not back_part_eaten:
+		# Fully intact pig - check for resources to destroy
 		var nearest_resource = find_nearest_destroyable_resource(grid_pos, detection_range)
 		if nearest_resource:
 			var resource_pos = grid.world_to_grid(nearest_resource.position)
@@ -188,22 +186,20 @@ func move():
 		else:
 			new_pos = move_linear(grid_pos)
 	else:
-		# If any part is eaten, just move linearly
+		# Partially eaten pig - just move linearly at reduced speed
 		new_pos = move_linear(grid_pos)
 	
-	# Update facing direction and position
+	# Update facing direction and position if we're moving
 	if new_pos != grid_pos:
 		update_facing_direction(new_pos)
 		
 		# Check for and destroy any collectibles at new positions
-		if not front_part_eaten and not back_part_eaten:
-			check_multi_cell_destroy_resources()
+		check_multi_cell_destroy_resources()
 		
 		grid_pos = new_pos
 		position = grid.grid_to_world(grid_pos)
 
 # Get world part position override to handle all orientations properly
-# Modify pig.gd get_world_part_position to handle horizontal-only layout
 func get_world_part_position(base_pos, relative_pos):
 	# For pig's collision, we only need to handle the swapped positions when facing right
 	if facing_direction.x > 0:  # Facing right - positions are swapped
@@ -269,9 +265,9 @@ func choose_new_direction():
 	# If no valid direction, set to zero
 	current_dir = Vector2i()
 
-# Override handle_part_eaten to handle pig parts with all orientations
+# Override handle_part_eaten to properly reset movement ability
 func handle_part_eaten(pos):
-	# Convert global position to local position relative to pig
+	# Determine which part was eaten
 	var local_pos = pos - grid_pos
 	
 	# Determine which part was eaten based on facing direction
@@ -284,7 +280,7 @@ func handle_part_eaten(pos):
 			back_part_eaten = true
 			if parts.size() > 1:
 				parts[1].visible = false
-	elif facing_direction.x < 0:  # Facing left - normal positions
+	else:  # All other directions (including left)
 		if local_pos == Vector2i(0, 0):  # Front
 			front_part_eaten = true
 			if parts.size() > 0:
@@ -293,41 +289,46 @@ func handle_part_eaten(pos):
 			back_part_eaten = true
 			if parts.size() > 1:
 				parts[1].visible = false
-	elif facing_direction.y > 0:  # Facing down
-		if local_pos == Vector2i(0, 0):  # Front
-			front_part_eaten = true
-			if parts.size() > 0:
-				parts[0].visible = false
-		elif local_pos == Vector2i(0, 1):  # Back
-			back_part_eaten = true
-			if parts.size() > 1:
-				parts[1].visible = false
-	elif facing_direction.y < 0:  # Facing up
-		if local_pos == Vector2i(0, 0):  # Front
-			front_part_eaten = true
-			if parts.size() > 0:
-				parts[0].visible = false
-		elif local_pos == Vector2i(0, -1):  # Back
-			back_part_eaten = true
-			if parts.size() > 1:
-				parts[1].visible = false
 	
 	# Set flags for damage state
 	has_missing_parts = true
-	can_move = false  # Stop movement for the current turn
+	can_move = false  # Stop movement for current turn only
+	
+	# NEW: Add a timer to restore movement on the next frame
+	var timer = Timer.new()
+	timer.wait_time = 0.25
+	timer.one_shot = true
+	timer.autostart = true
+	add_child(timer)
+	timer.timeout.connect(func(): 
+		can_move = true  # Restore movement ability
+		timer.queue_free()
+	)
+	
+	# Update the visual representation
+	update_part_positions()
 	
 	# Check if all parts are eaten
 	if front_part_eaten and back_part_eaten:
 		queue_free()
-		
+
 # Check all positions for resources to destroy (multi-cell animal)
+# In scripts/animals/pig.gd, add this function to override the base class's method:
+
+# Override the check_collectible_at_position method to only check the head position
 func check_multi_cell_destroy_resources():
 	# Safety check
-	if grid == null or not is_multi_cell:
+	if grid == null:
 		return
-		
-	for part_pos in part_positions:
-		var world_part_pos = get_world_part_position(grid_pos, part_pos)
-		var collectible = check_collectible_at_position(world_part_pos)
-		if collectible and can_destroy_resource(collectible):
-			destroy_resource(collectible)
+	
+	# Get head position - always the front part of the pig
+	var head_pos = grid_pos
+	
+	# If facing right, head is on the right side (the second cell)
+	if facing_direction.x < 0:
+		head_pos.x += 1
+	
+	# Check only the head position for resources
+	var collectible = check_collectible_at_position(head_pos)
+	if collectible and can_destroy_resource(collectible):
+		destroy_resource(collectible)

@@ -395,53 +395,25 @@ func find_nearest_destroyable_resource(curr_pos, max_distance):
 	
 	return nearest_resource
 	
-# For multi-cell animals - check if a part at a specific position was eaten
 func handle_part_eaten(pos):
-	# Convert grid position to local animal coordinates
-	var local_pos = pos - grid_pos
-	
-	# Based on the animal type, determine which part was eaten
-	match type:
-		"cow":
-			# Cow is 2x2
-			if local_pos == Vector2i(0, 0):  # Bottom-left
-				self.part_1_1_eaten = true
-				parts[0].visible = false
-			elif local_pos == Vector2i(0, -1):  # Top-left
-				self.part_1_2_eaten = true
-				parts[1].visible = false
-			elif local_pos == Vector2i(1, 0):  # Bottom-right
-				self.part_2_1_eaten = true
-				parts[2].visible = false
-			elif local_pos == Vector2i(1, -1):  # Top-right
-				self.part_2_2_eaten = true
-				parts[3].visible = false
-		"pig":
-			# Pig is 2x1 (horizontal) or 1x2 (vertical)
-			if facing_direction.x != 0:  # Horizontal
-				if local_pos == Vector2i(0, 0):  # Front
-					self.front_part_eaten = true
-					parts[0].visible = false
-				elif local_pos == Vector2i(1, 0):  # Back
-					self.back_part_eaten = true
-					parts[1].visible = false
-			else:  # Vertical
-				if local_pos == Vector2i(0, 0):  # Front
-					self.front_part_eaten = true
-					parts[0].visible = false
-				elif local_pos == Vector2i(0, 1):  # Back
-					self.back_part_eaten = true
-					parts[1].visible = false
+	# This is a base implementation - specific animals will override
 	
 	# Set flags for damaged state
 	has_missing_parts = true
-	can_move = false  # Stop movement for current turn
+	can_move = false  # Stop movement for CURRENT turn only
 	
-	# If all parts eaten, queue_free this animal
-	if type == "cow" and self.part_1_1_eaten and self.part_1_2_eaten and self.part_2_1_eaten and self.part_2_2_eaten:
-		queue_free()
-	elif type == "pig" and self.front_part_eaten and self.back_part_eaten:
-		queue_free()
+	# NEW: Add a single-frame timer to restore movement on the next frame
+	var timer = Timer.new()
+	timer.wait_time = 0.05  # Very short time
+	timer.one_shot = true
+	timer.autostart = true
+	add_child(timer)
+	timer.timeout.connect(func(): 
+		can_move = true  # Restore movement ability
+		timer.queue_free()
+	)
+
+
 
 # Check all positions for resources to destroy (multi-cell animal)
 func check_multi_cell_destroy_resources():

@@ -126,8 +126,6 @@ func initialize_multi_cell():
 		print("COW: Parts already created, count:", parts.size())
 		force_orientation()
 
-# In scripts/animals/cow.gd, modify force_orientation() to:
-
 func force_orientation():
 	print("COW: Forcing orientation with facing direction:", facing_direction)
 	
@@ -169,7 +167,6 @@ func force_orientation():
 	
 	print("COW: Parts positioned based on facing direction:", facing_direction)
 
-
 # Override update_facing_direction to track changes
 func update_facing_direction(new_pos):
 	print("COW: update_facing_direction called, old:", facing_direction, "new delta:", new_pos - grid_pos)
@@ -190,7 +187,6 @@ func update_multi_cell_rotation():
 	force_orientation()
 
 # This method ONLY affects what grid cells the cow occupies
-# Modify cow.gd get_world_part_position for horizontal-only layout
 func get_world_part_position(base_pos, relative_pos):
 	# For cow's collision, we need to handle the flipped positions when facing right
 	if facing_direction.x > 0:  # Facing right - positions are swapped
@@ -206,58 +202,53 @@ func get_world_part_position(base_pos, relative_pos):
 	# Default behavior for all other directions (normal positions)
 	return base_pos + relative_pos
 
-
-# Modified movement function to call force_orientation() after position changes
+# Modified move function with proper handling of partially eaten states
 func move():
-	print("COW: move() called, current facing:", facing_direction)
-	
-	# Standard movement code from before
+	# Skip if completely dead or paused for current turn
 	if not can_move:
 		return
 		
-	# Apply movement pattern based on damage state
-	var is_slow = (self.part_1_1_eaten or self.part_2_1_eaten) and not (self.part_1_1_eaten and self.part_2_1_eaten)
-	var is_fast = (self.part_1_2_eaten or self.part_2_2_eaten) and not (self.part_1_1_eaten and self.part_2_1_eaten and self.part_1_2_eaten and self.part_2_2_eaten)
+	# NEW CHECK: If both leg parts (bottom parts) are eaten, cow can't move at all
+	if part_1_1_eaten and part_2_1_eaten:
+		return
 	
-	# Count movement cycles
+	# Calculate movement slowdown based on damaged parts
+	var leg_parts_eaten = part_1_1_eaten or part_2_1_eaten  # Bottom parts are legs
+	var top_parts_eaten = part_1_2_eaten or part_2_2_eaten  # Top parts are body/head
+	
+	# Move counter for turn-based movement
 	move_counter += 1
 	
-	# Implement movement pattern based on damage
-	if is_slow:
-		if move_counter % 2 != 0:
-			return
-	elif not is_fast:
-		if move_counter % 2 != 0:
-			return
+	# Apply movement pattern based on damage state
+	if leg_parts_eaten and move_counter % 2 != 0:
+		# Move every other turn if leg parts are eaten
+		return
 	
 	# Safety checks
 	if grid == null or main == null or snake == null:
 		return
-		
+	
 	var snake_head_pos = snake.segments[0].grid_pos
 	var new_pos = grid_pos
 	
-	# Determine movement based on damage state
-	if (not self.part_1_2_eaten) and (not self.part_2_2_eaten):
-		new_pos = move_based_on_milk(grid_pos)
+	# Choose movement behavior based on damage state
+	if top_parts_eaten and not leg_parts_eaten:
+		# Faster but erratic movement when top parts are eaten but legs are intact
+		new_pos = move_recklessly(grid_pos, true)
 	else:
-		new_pos = move_recklessly(grid_pos, is_fast)
+		# Normal milk-seeking behavior
+		new_pos = move_based_on_milk(grid_pos)
 	
-	# If about to move, log it
-	if new_pos != grid_pos:
-		print("COW: About to move from", grid_pos, "to", new_pos)
-		
-	# Update facing direction and position
+	# Update facing direction and position if we're moving
 	if new_pos != grid_pos:
 		update_facing_direction(new_pos)
 		check_multi_cell_destroy_resources()
 		grid_pos = new_pos
 		position = grid.grid_to_world(grid_pos)
 		
-		# Force orientation again to be absolutely sure
+		# Ensure visual representation is updated
 		force_orientation()
 
-# Rest of the functions remain unchanged...
 func move_based_on_milk(curr_pos):
 	# Find nearest milk
 	var nearest_milk = find_nearest_milk()
@@ -370,7 +361,7 @@ func find_nearest_milk():
 	
 	return nearest_milk
 
-# Override handle_part_eaten to properly handle cow parts
+# Override handle_part_eaten to properly reset movement ability
 func handle_part_eaten(pos):
 	# Convert global position to local position relative to cow
 	var local_pos = pos - grid_pos
@@ -413,7 +404,18 @@ func handle_part_eaten(pos):
 	
 	# Set flags for damage state
 	has_missing_parts = true
-	can_move = false  # Stop movement for the current turn
+	can_move = false  # Stop movement for current turn only
+	
+	# NEW: Add a timer to restore movement on the next frame
+	var timer = Timer.new()
+	timer.wait_time = 0.05  # Very short time
+	timer.one_shot = true
+	timer.autostart = true
+	add_child(timer)
+	timer.timeout.connect(func(): 
+		can_move = true  # Restore movement ability
+		timer.queue_free()
+	)
 	
 	# Check if all parts are eaten
 	if self.part_1_1_eaten and self.part_1_2_eaten and self.part_2_1_eaten and self.part_2_2_eaten:
